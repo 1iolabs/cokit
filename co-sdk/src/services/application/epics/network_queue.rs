@@ -58,15 +58,22 @@ pub fn network_queue_message_epic(
 		Action::NetworkTaskQueue { co, task_id, task_type, task_name, task } => {
 			let context = context.clone();
 			let co = co.clone();
+			let process_co = co.clone();
 			let task_id = task_id.clone();
 			let task_type = task_type.clone();
 			let task_name = task_name.clone();
 			let task = task.clone();
 			Some(
-				async move { network_queue_task(&context, co, task_id, task_type, task_name, task).await }
-					.into_stream()
-					.try_ignore_elements()
-					.boxed(),
+				async move {
+					network_queue_task(&context, co, task_id, task_type, task_name, task).await?;
+					Ok(context
+						.network()
+						.await
+						.map(|_| Action::NetworkQueueProcess { co: Some(process_co), retry: 0 }))
+				}
+				.into_stream()
+				.filter_map(|action| ready(action.transpose()))
+				.boxed(),
 			)
 		},
 		_ => None,
@@ -412,11 +419,45 @@ fn process(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{ApplicationBuilder, ReducerChangeContext, CO_ID_LOCAL};
+	use crate::{
+		library::network_queue::{network_queue_task_in_list, LIST_NAME_BACKLOG},
+		ApplicationBuilder, NetworkSettings, ReducerChangeContext, CO_ID_LOCAL,
+	};
 	use cid::Cid;
 	use co_actor::EpicExt;
-	use co_primitives::{Did, ReducerAction};
+	use co_primitives::{BlockSerializer, Did, ReducerAction};
 	use ipld_core::ipld::Ipld;
+	use std::time::Duration;
+
+	fn queued_task(task_id: &str, task_type: &str) -> Action {
+		Action::NetworkTaskQueue {
+			co: CoId::from("co:queued"),
+			task_id: task_id.to_owned(),
+			task_type: task_type.to_owned(),
+			task_name: "Test network task".to_owned(),
+			task: BlockSerializer::default().serialize(&"payload").expect("serialize task"),
+		}
+	}
+
+	async fn application_with_network(identifier: &str) -> crate::Application {
+		let mut application = ApplicationBuilder::new_memory(identifier)
+			.without_keychain()
+			.build()
+			.await
+			.expect("application");
+		let mut completed = Box::pin(application.actions().filter(|action| {
+			ready(matches!(action, Action::NetworkQueueProcessComplete { co: None, is_empty: true, retry: 0 }))
+		}));
+		application
+			.create_network(NetworkSettings::default().with_localhost())
+			.await
+			.expect("network");
+		time::timeout(Duration::from_secs(10), completed.next())
+			.await
+			.expect("startup queue processing")
+			.expect("startup queue completion");
+		application
+	}
 
 	fn core_action(
 		application: &crate::Application,
@@ -437,6 +478,82 @@ mod tests {
 			cid: Cid::default().into(),
 			head: Cid::default(),
 		}
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn online_network_task_admission_wakes_once_after_persistence_and_failure_does_not_wake() {
+		let application = application_with_network("network-queue-local-admission-online").await;
+		let action = queued_task("online-task", "did-didcomm");
+		let actions = Actions::default();
+		let mut admission = Box::pin(
+			network_queue_message_epic(&actions, &action, &(), application.context())
+				.expect("network task admission stream"),
+		);
+		let wake = admission
+			.next()
+			.await
+			.expect("one admission result")
+			.expect("successful admission");
+
+		let local_co = application.local_co_reducer().await.expect("local co");
+		assert!(
+			network_queue_task_in_list(&local_co, LIST_NAME_BACKLOG, "online-task")
+				.await
+				.expect("read backlog")
+				.is_some(),
+			"task is durable when the wake is observed"
+		);
+		assert!(matches!(
+			wake,
+			Action::NetworkQueueProcess { co: Some(co), retry: 0 } if co.as_str() == "co:queued"
+		));
+		assert!(admission.next().await.is_none(), "successful admission emits exactly one action");
+
+		let failed = network_queue_message_epic(&actions, &action, &(), application.context())
+			.expect("duplicate admission stream")
+			.collect::<Vec<_>>()
+			.await;
+		assert_eq!(failed.len(), 1, "failed admission emits only its error");
+		assert!(failed[0].is_err(), "failed admission must not emit a wake");
+
+		let generic = queued_task("generic-task", "test-network-task");
+		let emitted = network_queue_message_epic(&actions, &generic, &(), application.context())
+			.expect("generic network task admission stream")
+			.collect::<Vec<_>>()
+			.await;
+		assert_eq!(emitted.len(), 1, "non-DID admission emits exactly one wake");
+		assert!(matches!(
+			emitted.into_iter().next().expect("wake").expect("successful admission"),
+			Action::NetworkQueueProcess { co: Some(co), retry: 0 } if co.as_str() == "co:queued"
+		));
+		application.context().inner.shutdown().cancel();
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn offline_network_task_admission_persists_without_wake() {
+		let application = ApplicationBuilder::new_memory("network-queue-local-admission-offline")
+			.without_keychain()
+			.build()
+			.await
+			.expect("application");
+		let action = queued_task("offline-task", "did-didcomm");
+		let emitted = network_queue_message_epic(&Actions::default(), &action, &(), application.context())
+			.expect("network task admission stream")
+			.collect::<Vec<_>>()
+			.await;
+
+		assert!(emitted.is_empty(), "offline admission must not emit a wake");
+		let local_co = application.local_co_reducer().await.expect("local co");
+		assert!(
+			network_queue_task_in_list(&local_co, LIST_NAME_BACKLOG, "offline-task")
+				.await
+				.expect("read backlog")
+				.is_some(),
+			"offline task remains durable"
+		);
+		application.context().inner.shutdown().cancel();
 	}
 
 	#[tokio::test]

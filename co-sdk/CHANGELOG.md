@@ -31,6 +31,7 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
   retaining the latest pending delivery intent for each key.
 - Queue claims and completions are conditional; stale operations are no-ops and
   cannot mutate a newer task generation.
+- New network tasks now wake the existing queue processor when networking is available.
 - **Breaking.** `HeadsDeliveryAttempt` is now `HeadsDeliveryPhase`, with
   `Admission` and `Execution` variants.
 - The queue does not provide exactly-once sends or takeover of tasks abandoned
