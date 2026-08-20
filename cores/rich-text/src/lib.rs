@@ -4,13 +4,12 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault, LazyTransaction, Link,
-	OptionLink, Reducer, ReducerAction, TagValue, WeakCid,
+	co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, Reducer,
+	ReducerAction, TagValue, WeakCid,
 };
-use futures::{pin_mut, FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, FutureExt, Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
-	future::ready,
 	ops::Range,
 };
 
@@ -40,24 +39,24 @@ pub struct InsertAction {
 
 #[co]
 pub struct DeleteAction {
-	/// The position to delete.
+	/// The scalar-start byte position to delete.
 	#[serde(rename = "l")]
 	pub at: Position,
 
-	/// The last position to deleted.
-	/// If omited only `at` is deleted.
+	/// The inclusive final byte to delete.
+	/// If omitted, only the scalar at `at` is deleted.
 	#[serde(rename = "r", default, skip_serializing_if = "IsDefault::is_default")]
 	pub last: Option<Position>,
 }
 
 #[co]
 pub struct FormatAction {
-	/// The position to format.
+	/// The scalar-start byte position to format.
 	#[serde(rename = "l")]
 	pub at: Position,
 
-	/// The last position to formatted.
-	/// If omited only `at` is formatted.
+	/// The inclusive final byte to format.
+	/// If omitted, only the scalar at `at` is formatted.
 	#[serde(rename = "r", default, skip_serializing_if = "IsDefault::is_default")]
 	pub last: Option<Position>,
 
@@ -91,7 +90,7 @@ pub enum InsertionPoint {
 	/// Last position.
 	#[serde(rename = "r")]
 	End,
-	/// Before position.
+	/// Before the scalar starting at this byte position.
 	#[serde(rename = "b")]
 	Before(Position),
 }
@@ -105,10 +104,12 @@ impl InsertionPoint {
 	}
 }
 
+/// A UTF-8 byte position within text created by one action.
 #[co]
 #[derive(Default, Copy)]
 pub struct Position(WeakCid, usize);
 impl Position {
+	/// The preceding byte position.
 	pub fn left(&self) -> Option<Self> {
 		if self.1 > 0 {
 			Some(Self(self.0, self.1 - 1))
@@ -117,10 +118,12 @@ impl Position {
 		}
 	}
 
+	/// The following byte position.
 	pub fn right(&self) -> Self {
 		Self(self.0, self.1 + 1)
 	}
 
+	/// The position after `by` bytes.
 	pub fn right_by(&self, by: usize) -> Self {
 		Self(self.0, self.1 + by)
 	}
@@ -186,7 +189,7 @@ impl RichText {
 		}
 	}
 
-	/// Stream characters with position and formatting.
+	/// Stream Unicode scalars with UTF-8 byte positions and formatting.
 	pub fn chars<S>(
 		&self,
 		storage: S,
@@ -210,7 +213,7 @@ impl RichText {
 				if !run.deleted {
 					for char in run.text.chars() {
 						yield (char, position, run.attributes);
-						position = position.right();
+						position = position.right_by(char.len_utf8());
 					}
 				}
 
@@ -255,25 +258,60 @@ pub struct Run {
 	pub deleted: bool,
 }
 impl Run {
-	/// The first character in this run.
+	/// The first byte in this run.
 	pub fn first(&self) -> Position {
 		self.id
 	}
 
-	/// The last character in this run.
-	/// If the run has only one character this is equal to frist.
+	/// The last byte in this run.
 	pub fn last(&self) -> Position {
 		assert!(!self.text.is_empty());
 		self.id.right_by(self.text.len() - 1)
 	}
 
+	/// The half-open UTF-8 byte range in the originating action.
 	pub fn range(&self) -> Range<usize> {
 		self.id.1..self.id.1 + self.text.len()
 	}
 
+	/// Whether this run contains the byte position.
 	pub fn contains(&self, at: Position) -> bool {
 		self.id.0 == at.0 && self.range().contains(&at.1)
 	}
+
+	fn text_offset(&self, at: Position) -> Option<usize> {
+		if self.id.0 != at.0 {
+			return None;
+		}
+		let offset = at.1.checked_sub(self.id.1)?;
+		(offset < self.text.len()).then_some(offset)
+	}
+
+	fn is_char_start(&self, at: Position) -> bool {
+		self.text_offset(at).is_some_and(|offset| self.text.is_char_boundary(offset))
+	}
+
+	fn is_char_end(&self, at: Position) -> bool {
+		self.text_offset(at)
+			.and_then(|offset| offset.checked_add(1))
+			.is_some_and(|offset| self.text.is_char_boundary(offset))
+	}
+
+	fn char_last(&self, at: Position) -> Option<Position> {
+		let offset = self.text_offset(at)?;
+		if !self.text.is_char_boundary(offset) {
+			return None;
+		}
+		let char = self.text[offset..].chars().next()?;
+		Some(at.right_by(char.len_utf8() - 1))
+	}
+}
+
+fn action_last(run: &Run, at: Position, last: Option<Position>) -> anyhow::Result<Position> {
+	if !run.is_char_start(at) {
+		return Err(anyhow!("Invalid range"));
+	}
+	last.map_or_else(|| run.char_last(at).ok_or_else(|| anyhow!("Invalid range")), Ok)
 }
 
 #[co]
@@ -439,7 +477,7 @@ where
 	let mut run = transaction.get_run(at).await?;
 
 	// last
-	let last = action.last.unwrap_or_else(|| action.at.right());
+	let last = action_last(&run, at, action.last)?;
 
 	// apply
 	loop {
@@ -454,6 +492,10 @@ where
 
 		// slipt off right?
 		let is_last = if run.contains(last) {
+			if !run.is_char_end(last) {
+				return Err(anyhow!("Invalid range"));
+			}
+
 			// split
 			if run.last() != last {
 				let (left, _right) = split(storage, state, transaction, run, last.right()).await?;
@@ -473,15 +515,11 @@ where
 		transaction.runs.get_mut().await?.insert(run.id, run).await?;
 
 		// next
-		if !is_last {
-			if let Some(next_id) = next_id {
-				run = transaction.get_run(next_id).await?;
-				continue;
-			}
+		if is_last {
+			break;
 		}
-
-		// done
-		break;
+		let next_id = next_id.ok_or_else(|| anyhow!("Invalid range"))?;
+		run = transaction.get_run(next_id).await?;
 	}
 
 	Ok(())
@@ -499,13 +537,11 @@ where
 {
 	let at = action.at;
 	let mut run = transaction.get_run(at).await?;
+	let last = action_last(&run, at, action.last)?;
 
 	// attributes
 	let attributes = attributes_run(storage, Some(&run), &action.attributes).await?;
 	let attributes_link = storage.set_value(&attributes).await?.into();
-
-	// last
-	let last = action.last.unwrap_or_else(|| action.at.right());
 
 	// apply
 	loop {
@@ -520,6 +556,10 @@ where
 
 		// slipt off right?
 		let is_last = if run.contains(last) {
+			if !run.is_char_end(last) {
+				return Err(anyhow!("Invalid range"));
+			}
+
 			// split
 			if run.last() != last {
 				let (left, _right) = split(storage, state, transaction, run, last.right()).await?;
@@ -539,15 +579,11 @@ where
 		transaction.runs.get_mut().await?.insert(run.id, run).await?;
 
 		// next
-		if !is_last {
-			if let Some(next_id) = next_id {
-				run = transaction.get_run(next_id).await?;
-				continue;
-			}
+		if is_last {
+			break;
 		}
-
-		// done
-		break;
+		let next_id = next_id.ok_or_else(|| anyhow!("Invalid range"))?;
+		run = transaction.get_run(next_id).await?;
 	}
 
 	Ok(())
@@ -657,12 +693,12 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	// validate
-	if !run.contains(at) {
-		return Err(anyhow!("Invalid range"));
-	}
+	let text_offset = run
+		.text_offset(at)
+		.filter(|offset| run.text.is_char_boundary(*offset))
+		.ok_or_else(|| anyhow!("Invalid range"))?;
 
 	// text
-	let text_offset = at.1 - run.id.1;
 	let text_left = run.text[0..text_offset].to_owned();
 	let text_right = run.text[text_offset..].to_owned();
 
@@ -765,6 +801,7 @@ where
 	})
 }
 
+/// A UTF-8 byte-indexed view of rich text.
 pub struct TextModel<S> {
 	storage: S,
 	state: OptionLink<RichText>,
@@ -818,8 +855,16 @@ where
 		}
 	}
 
-	/// Index for position.
+	/// UTF-8 byte index for a scalar-start position.
 	pub async fn index(&self, at: &Position) -> anyhow::Result<usize> {
+		self.position_index(at, false).await
+	}
+
+	async fn insertion_index(&self, at: &Position) -> anyhow::Result<usize> {
+		self.position_index(at, true).await
+	}
+
+	async fn position_index(&self, at: &Position, include_empty_anchor: bool) -> anyhow::Result<usize> {
 		let state = self.storage.get_value_or_default(&self.state).await?;
 
 		// walk runs
@@ -827,8 +872,14 @@ where
 		let runs = state.runs(self.storage.clone());
 		pin_mut!(runs);
 		while let Some(run) = runs.try_next().await? {
+			if include_empty_anchor && run.id == *at && run.text.is_empty() {
+				return Ok(index);
+			}
 			// done?
 			if run.contains(*at) {
+				if !run.is_char_start(*at) {
+					return Err(anyhow!("Invalid position: {:?}", at));
+				}
 				return Ok(if !run.deleted { index + at.1 - run.id.1 } else { index });
 			}
 
@@ -840,7 +891,7 @@ where
 		Err(anyhow!("Position not found: {:?}", at))
 	}
 
-	/// Range for positions.
+	/// Half-open UTF-8 byte range for action positions.
 	pub async fn range(&self, at: &Position, last: &Option<Position>) -> anyhow::Result<Range<usize>> {
 		let state = self.storage.get_value_or_default(&self.state).await?;
 
@@ -848,29 +899,30 @@ where
 		let mut index = 0;
 		let mut start_found = false;
 		let mut start = 0;
-		let mut start_deleted = false;
+		let mut last = *last;
 		let runs = state.runs(self.storage.clone());
 		pin_mut!(runs);
 		while let Some(run) = runs.try_next().await? {
 			// done?
 			if !start_found && run.contains(*at) {
+				if !run.is_char_start(*at) {
+					return Err(anyhow!("Invalid position: {:?}", at));
+				}
 				start = if !run.deleted { index + at.1 - run.id.1 } else { index };
 				start_found = true;
-				start_deleted = run.deleted;
+				if last.is_none() {
+					last = run.char_last(*at);
+				} else if last.is_some_and(|last| run.contains(last) && last.1 < at.1) {
+					return Err(anyhow!("Invalid range"));
+				}
 			}
 			if start_found {
-				if let Some(last) = last {
-					if run.contains(*last) {
-						return Ok(Range {
-							start,
-							end: if !run.deleted { index + last.1 - run.id.1 + 1 } else { index },
-						});
+				let last = last.ok_or_else(|| anyhow!("Invalid range"))?;
+				if run.contains(last) {
+					if !run.is_char_end(last) {
+						return Err(anyhow!("Invalid position: {:?}", last));
 					}
-				} else if run.deleted && start_deleted {
-					// return a empty range as the range is fully deleted
-					return Ok(Range { start, end: start });
-				} else {
-					return Ok(Range { start, end: start + 1 });
+					return Ok(Range { start, end: if !run.deleted { index + last.1 - run.id.1 + 1 } else { index } });
 				}
 			}
 
@@ -885,46 +937,64 @@ where
 		Err(anyhow!("Position not found: {:?}", last))
 	}
 
-	/// Position for index.
+	/// Scalar-start position at a UTF-8 byte index.
 	pub async fn position(&self, index: usize) -> anyhow::Result<Option<Position>> {
 		let state = self.storage.get_value_or_default(&self.state).await?;
-		let at = state
-			.chars(self.storage.clone())
-			.skip(index)
-			.map_ok(|(_char, position, _attributes)| position)
-			.try_first()
-			.await?;
-		Ok(at)
+		let mut current = 0;
+		let chars = state.chars(self.storage.clone());
+		pin_mut!(chars);
+		while let Some((char, position, _attributes)) = chars.try_next().await? {
+			if current == index {
+				return Ok(Some(position));
+			}
+			current += char.len_utf8();
+			if index < current {
+				return Err(anyhow!("Invalid index: {}", index));
+			}
+		}
+		if current == index {
+			Ok(None)
+		} else {
+			Err(anyhow!("Index not found: {}", index))
+		}
 	}
 
-	/// Positions for range.
+	/// Action positions for a half-open UTF-8 byte range.
 	pub async fn position_range(&self, range: &Range<usize>) -> anyhow::Result<(Option<Position>, Option<Position>)> {
 		// validate
 		if range.is_empty() {
 			return Err(anyhow!("Invalid range: {:?}", range));
 		}
 
-		// find indicies
+		// find positions
 		let state = self.storage.get_value_or_default(&self.state).await?;
-		let (at, last) = state
-			.chars(self.storage.clone())
-			.enumerate()
-			.skip(range.start)
-			.take(range.len())
-			.map(|(i, result)| result.map(|(_char, position, _attributes)| (i, position)))
-			.try_fold((None, None), |(mut at, mut last), (i, position)| {
-				if i == range.start {
+		let mut index = 0;
+		let mut at = None;
+		let mut scalar_count = 0;
+		let chars = state.chars(self.storage.clone());
+		pin_mut!(chars);
+		while let Some((char, position, _attributes)) = chars.try_next().await? {
+			let end = index + char.len_utf8();
+			if at.is_none() {
+				if range.start == index {
 					at = Some(position);
+				} else if range.start < end {
+					return Err(anyhow!("Invalid range: {:?}", range));
 				}
-				if i == range.end {
-					last = Some(position);
+			}
+			if at.is_some() {
+				if range.end < end {
+					return Err(anyhow!("Invalid range: {:?}", range));
 				}
-				ready(Result::<_, anyhow::Error>::Ok((at, last)))
-			})
-			.await?;
-
-		// result
-		Ok((at, if range.len() == 1 { None } else { last }))
+				scalar_count += 1;
+				let last = position.right_by(char.len_utf8() - 1);
+				if range.end == end {
+					return Ok((at, if scalar_count == 1 { None } else { Some(last) }));
+				}
+			}
+			index = end;
+		}
+		Err(anyhow!("Invalid range: {:?}", range))
 	}
 
 	pub async fn insert(
@@ -967,10 +1037,20 @@ where
 			match action {
 				RichTextAction::Insert(action) => {
 					let insertion_point = normalize_insertion_point(&state, action.at.clone());
-					let index = if let Some(position) = insertion_point.position(&state) {
-						self.index(&position).await?
-					} else {
-						0
+					let index = match &insertion_point {
+						InsertionPoint::Start => 0,
+						InsertionPoint::End => {
+							let mut index = 0;
+							let runs = state.runs(self.storage.clone());
+							pin_mut!(runs);
+							while let Some(run) = runs.try_next().await? {
+								if !run.deleted {
+									index += run.text.len();
+								}
+							}
+							index
+						},
+						InsertionPoint::Before(position) => self.insertion_index(position).await?,
 					};
 					let attributes = attributes_insertion_point(
 						&self.storage,
@@ -1019,26 +1099,52 @@ pub enum TextModelChange {
 mod tests {
 	use crate::{
 		Attributes, AttributesOperation, DeleteAction, FormatAction, InsertAction, InsertionPoint, Position, RichText,
-		RichTextAction, Run,
+		RichTextAction, Run, TextModel, TextModelChange,
 	};
 	use cid::Cid;
-	use co_api::{BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, Reducer, ReducerAction};
+	use co_api::{BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, Link, Reducer, ReducerAction};
 	use co_storage::MemoryBlockStorage;
 	use futures::{StreamExt, TryStreamExt};
 
-	async fn dispatch<S>(storage: &S, time: &mut Date, state: RichText, action: impl Into<RichTextAction>) -> RichText
+	async fn apply<S>(
+		storage: &S,
+		state: RichText,
+		action_link: Link<ReducerAction<RichTextAction>>,
+	) -> anyhow::Result<RichText>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let state_link = storage.set_value(&state).await?;
+		let next_state_link =
+			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true)).await?;
+		Ok(storage.get_value(&next_state_link).await?)
+	}
+
+	async fn try_dispatch<S>(
+		storage: &S,
+		time: &mut Date,
+		state: RichText,
+		action: impl Into<RichTextAction>,
+	) -> anyhow::Result<RichText>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
 		let action = ReducerAction { core: "".to_owned(), from: "".to_owned(), payload: action.into(), time: *time };
 		*time += 1;
-		let action_link = storage.set_value(&action).await.unwrap();
-		let state_link = storage.set_value(&state).await.unwrap();
-		let next_state_link =
-			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true))
-				.await
-				.unwrap();
-		storage.get_value(&next_state_link).await.unwrap()
+		let action_link = storage.set_value(&action).await?;
+		apply(storage, state, action_link).await
+	}
+
+	async fn dispatch<S>(storage: &S, time: &mut Date, state: RichText, action: impl Into<RichTextAction>) -> RichText
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		try_dispatch(storage, time, state, action).await.unwrap()
+	}
+
+	async fn text_model(storage: &MemoryBlockStorage, state: &RichText) -> TextModel<MemoryBlockStorage> {
+		let state = storage.set_value(state).await.unwrap();
+		TextModel { storage: storage.clone(), state: state.into() }
 	}
 
 	#[test]
@@ -1061,6 +1167,239 @@ mod tests {
 		assert!(run.contains(Position(head, 3)));
 		assert!(run.contains(Position(head, 4)));
 		assert!(!run.contains(Position(head, 5)));
+
+		let run = Run { text: "Aé中😀B".to_owned(), ..run };
+		assert_eq!(run.last(), Position(head, 10));
+		assert_eq!(run.range(), 0..11);
+		for offset in [0, 1, 3, 6, 10] {
+			assert!(run.is_char_start(Position(head, offset)));
+		}
+		for offset in [0, 2, 5, 9, 10] {
+			assert!(run.is_char_end(Position(head, offset)));
+		}
+	}
+
+	#[tokio::test]
+	async fn test_utf8_byte_positions_and_split_boundaries() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let text = "Aé中😀B";
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: text.to_owned() },
+		)
+		.await;
+		let characters = state
+			.chars(storage.clone())
+			.map_ok(|(char, position, _attributes)| (char, position.1))
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		assert_eq!(characters, vec![('A', 0), ('é', 1), ('中', 3), ('😀', 6), ('B', 10)]);
+
+		let id = state.left.unwrap();
+		for offset in [0, 1, 3, 6, 10] {
+			let mut expected = text.to_owned();
+			expected.insert(offset, '|');
+			let next = dispatch(
+				&storage,
+				&mut time,
+				state.clone(),
+				InsertAction {
+					at: InsertionPoint::Before(id.right_by(offset)),
+					attributes: Default::default(),
+					text: "|".to_owned(),
+				},
+			)
+			.await;
+			assert_eq!(next.plain_text(&storage).await.unwrap(), expected);
+		}
+		let next = dispatch(
+			&storage,
+			&mut time,
+			state.clone(),
+			InsertAction { at: InsertionPoint::End, attributes: Default::default(), text: "|".to_owned() },
+		)
+		.await;
+		assert_eq!(next.plain_text(&storage).await.unwrap(), "Aé中😀B|");
+
+		for offset in [2, 4, 5, 7, 8, 9, 11] {
+			let result = try_dispatch(
+				&storage,
+				&mut time,
+				state.clone(),
+				InsertAction {
+					at: InsertionPoint::Before(id.right_by(offset)),
+					attributes: Default::default(),
+					text: "|".to_owned(),
+				},
+			)
+			.await;
+			assert!(result.is_err(), "offset {offset} must be rejected");
+		}
+		assert_eq!(state.plain_text(&storage).await.unwrap(), text);
+	}
+
+	#[tokio::test]
+	async fn test_omitted_last_affects_one_utf8_scalar() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let text = "Aé中😀B";
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: text.to_owned() },
+		)
+		.await;
+		let characters = state
+			.chars(storage.clone())
+			.map_ok(|(char, position, attributes)| (char, position, attributes))
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let base_attributes = characters[0].2;
+		let marked = Attributes::default().with_attribute("marked", true);
+		let marked_link = storage.set_value(&marked).await.unwrap().into();
+
+		for (target, (char, position, _attributes)) in characters.iter().enumerate() {
+			let mut expected = text.to_owned();
+			expected.replace_range(position.1..position.1 + char.len_utf8(), "");
+			let deleted =
+				dispatch(&storage, &mut time, state.clone(), DeleteAction { at: *position, last: None }).await;
+			assert_eq!(deleted.plain_text(&storage).await.unwrap(), expected);
+
+			let formatted = dispatch(
+				&storage,
+				&mut time,
+				state.clone(),
+				FormatAction { at: *position, last: None, attributes: AttributesOperation::Merge(marked.clone()) },
+			)
+			.await;
+			let attributes = formatted
+				.chars(storage.clone())
+				.map_ok(|(_char, _position, attributes)| attributes)
+				.try_collect::<Vec<_>>()
+				.await
+				.unwrap();
+			for (index, attributes) in attributes.into_iter().enumerate() {
+				assert_eq!(attributes, if index == target { marked_link } else { base_attributes });
+			}
+		}
+	}
+
+	#[tokio::test]
+	async fn test_utf8_ranges_cross_tombstones() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "Aé中😀B".to_owned() },
+		)
+		.await;
+		let positions = state
+			.chars(storage.clone())
+			.map_ok(|(_char, position, _attributes)| position)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let last = positions[3].right_by('😀'.len_utf8() - 1);
+
+		let deleted =
+			dispatch(&storage, &mut time, state.clone(), DeleteAction { at: positions[1], last: Some(last) }).await;
+		assert_eq!(deleted.plain_text(&storage).await.unwrap(), "AB");
+
+		let tombstoned = dispatch(&storage, &mut time, state, DeleteAction { at: positions[2], last: None }).await;
+		let deleted =
+			dispatch(&storage, &mut time, tombstoned, DeleteAction { at: positions[1], last: Some(last) }).await;
+		assert_eq!(deleted.plain_text(&storage).await.unwrap(), "AB");
+	}
+
+	#[tokio::test]
+	async fn test_invalid_utf8_ranges_leave_state_unchanged() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let text = "Aé中😀B";
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: text.to_owned() },
+		)
+		.await;
+		let id = state.left.unwrap();
+		let actions = [
+			RichTextAction::Delete(DeleteAction { at: id.right_by(2), last: None }),
+			RichTextAction::Delete(DeleteAction { at: id.right_by(1), last: Some(id.right_by(11)) }),
+			RichTextAction::Format(FormatAction {
+				at: id.right_by(1),
+				last: Some(id.right_by(7)),
+				attributes: AttributesOperation::RemoveAll,
+			}),
+			RichTextAction::Format(FormatAction {
+				at: id.right_by(3),
+				last: Some(id),
+				attributes: AttributesOperation::RemoveAll,
+			}),
+		];
+
+		for action in actions {
+			assert!(try_dispatch(&storage, &mut time, state.clone(), action).await.is_err());
+			assert_eq!(state.plain_text(&storage).await.unwrap(), text);
+		}
+	}
+
+	#[tokio::test]
+	async fn test_concurrent_utf8_insert_delete_is_deterministic() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "é中".to_owned() },
+		)
+		.await;
+		let positions = state
+			.chars(storage.clone())
+			.map_ok(|(_char, position, _attributes)| position)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let insert = ReducerAction {
+			core: "".to_owned(),
+			from: "insert".to_owned(),
+			payload: InsertAction {
+				at: InsertionPoint::Before(positions[1]),
+				attributes: Default::default(),
+				text: "😀".to_owned(),
+			}
+			.into(),
+			time: 10,
+		};
+		let delete = ReducerAction {
+			core: "".to_owned(),
+			from: "delete".to_owned(),
+			payload: DeleteAction { at: positions[0], last: None }.into(),
+			time: 10,
+		};
+		let insert_link = storage.set_value(&insert).await.unwrap();
+		let delete_link = storage.set_value(&delete).await.unwrap();
+
+		let insert_delete = apply(&storage, state.clone(), insert_link).await.unwrap();
+		let insert_delete = apply(&storage, insert_delete, delete_link).await.unwrap();
+		let delete_insert = apply(&storage, state.clone(), delete_link).await.unwrap();
+		let delete_insert = apply(&storage, delete_insert, insert_link).await.unwrap();
+
+		assert_eq!(insert_delete.plain_text(&storage).await.unwrap(), "😀中");
+		assert_eq!(delete_insert.plain_text(&storage).await.unwrap(), "😀中");
+		let insert_delete_runs = insert_delete.runs(storage.clone()).try_collect::<Vec<_>>().await.unwrap();
+		let delete_insert_runs = delete_insert.runs(storage.clone()).try_collect::<Vec<_>>().await.unwrap();
+		assert_eq!(insert_delete_runs, delete_insert_runs);
 	}
 
 	#[tokio::test]
@@ -1251,8 +1590,6 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_text_model_range_uses_last_position_for_span_end() {
-		use crate::TextModel;
-
 		let storage = MemoryBlockStorage::default();
 		let mut time = 1;
 
@@ -1282,5 +1619,207 @@ mod tests {
 		let range = model.range(&at, &Some(last)).await.unwrap();
 
 		assert_eq!(range, 1..4);
+	}
+
+	#[tokio::test]
+	async fn test_text_model_utf8_byte_round_trips() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "Aé中😀B".to_owned() },
+		)
+		.await;
+		let positions = state
+			.chars(storage.clone())
+			.map_ok(|(_char, position, _attributes)| position)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let model = text_model(&storage, &state).await;
+		let ranges = [0..1, 1..3, 3..6, 6..10, 10..11];
+
+		for (position, range) in positions.iter().zip(ranges.iter()) {
+			assert_eq!(model.position(range.start).await.unwrap(), Some(*position));
+			assert_eq!(model.index(position).await.unwrap(), range.start);
+			let (at, last) = model.position_range(range).await.unwrap();
+			assert_eq!((at, last), (Some(*position), None));
+			assert_eq!(model.range(&at.unwrap(), &last).await.unwrap(), *range);
+		}
+		assert_eq!(model.position(11).await.unwrap(), None);
+		for index in [2, 4, 5, 7, 8, 9, 12] {
+			assert!(model.position(index).await.is_err(), "index {index} must be rejected");
+		}
+		assert!(model.index(&positions[1].right()).await.is_err());
+
+		let range = 1..10;
+		let (at, last) = model.position_range(&range).await.unwrap();
+		assert_eq!(at, Some(positions[1]));
+		assert_eq!(last, Some(positions[3].right_by('😀'.len_utf8() - 1)));
+		assert_eq!(model.range(&at.unwrap(), &last).await.unwrap(), range);
+
+		for range in [0..0, 1..2, 2..3, 10..12, 11..12] {
+			assert!(model.position_range(&range).await.is_err(), "range {range:?} must be rejected");
+		}
+		assert!(model.range(&positions[1], &Some(positions[3].right())).await.is_err());
+		assert!(model.range(&positions[2], &Some(positions[0])).await.is_err());
+	}
+
+	#[tokio::test]
+	async fn test_text_model_utf8_edits_and_changes() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "Aé中😀B".to_owned() },
+		)
+		.await;
+		let model = text_model(&storage, &state).await;
+		let insert = model.insert(3, "|".to_owned(), Default::default()).await.unwrap();
+		let insert_end = model.insert(11, "!".to_owned(), Default::default()).await.unwrap();
+		let empty_insert = model.insert(3, String::new(), Default::default()).await.unwrap();
+		assert!(model.insert(2, "|".to_owned(), Default::default()).await.is_err());
+		assert!(model.insert(12, "|".to_owned(), Default::default()).await.is_err());
+
+		let deleted = model.delete(1..10).await.unwrap();
+		let single = model.delete(1..3).await.unwrap();
+		let marked = Attributes::default().with_attribute("marked", true);
+		let formatted = model.format(1..10, AttributesOperation::Merge(marked.clone())).await.unwrap();
+		match &single {
+			RichTextAction::Delete(action) => assert_eq!(action.last, None),
+			_ => panic!("expected delete action"),
+		}
+
+		let inserted = dispatch(&storage, &mut time, state.clone(), insert.clone()).await;
+		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
+		let inserted = dispatch(&storage, &mut time, state.clone(), insert_end.clone()).await;
+		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé中😀B!");
+		let anchored = dispatch(&storage, &mut time, state.clone(), empty_insert.clone()).await;
+		assert_eq!(anchored.plain_text(&storage).await.unwrap(), "Aé中😀B");
+		let anchored_model = text_model(&storage, &anchored).await;
+		assert_eq!(anchored_model.position(3).await.unwrap(), model.position(3).await.unwrap());
+		let anchor = anchored
+			.runs(storage.clone())
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap()
+			.into_iter()
+			.find(|run| run.text.is_empty())
+			.unwrap()
+			.id;
+		assert!(anchored_model.index(&anchor).await.is_err());
+		let before_anchor: RichTextAction =
+			InsertAction { at: InsertionPoint::Before(anchor), attributes: Default::default(), text: "|".to_owned() }
+				.into();
+		let anchor_changes = anchored_model.text_change(std::slice::from_ref(&before_anchor)).await.unwrap();
+		match &anchor_changes[0] {
+			TextModelChange::Insert { index, .. } => assert_eq!(*index, 3),
+			_ => panic!("expected insert change"),
+		}
+		let inserted = dispatch(&storage, &mut time, anchored, before_anchor).await;
+		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
+		let deleted_state = dispatch(&storage, &mut time, state.clone(), deleted.clone()).await;
+		assert_eq!(deleted_state.plain_text(&storage).await.unwrap(), "AB");
+
+		let formatted_state = dispatch(&storage, &mut time, state.clone(), formatted.clone()).await;
+		let attributes = formatted_state
+			.chars(storage.clone())
+			.map_ok(|(_char, _position, attributes)| attributes)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let base_attributes = attributes[0];
+		let marked_link = storage.set_value(&marked).await.unwrap().into();
+		assert_eq!(attributes, vec![base_attributes, marked_link, marked_link, marked_link, base_attributes]);
+
+		let changes = model
+			.text_change(&[insert, insert_end, empty_insert, deleted, formatted])
+			.await
+			.unwrap();
+		assert_eq!(changes.len(), 5);
+		for (change, index, text) in [(&changes[0], 3, "|"), (&changes[1], 11, "!"), (&changes[2], 3, "")] {
+			match change {
+				TextModelChange::Insert { index: actual, text: actual_text, .. } => {
+					assert_eq!((*actual, actual_text.as_str()), (index, text));
+				},
+				_ => panic!("expected insert change"),
+			}
+		}
+		match &changes[3] {
+			TextModelChange::Delete { range } => assert_eq!(range, &(1..10)),
+			_ => panic!("expected delete change"),
+		}
+		match &changes[4] {
+			TextModelChange::Format { range, attributes } => {
+				assert_eq!(range, &(1..10));
+				assert_eq!(attributes, &marked);
+			},
+			_ => panic!("expected format change"),
+		}
+	}
+
+	#[tokio::test]
+	async fn test_text_model_tombstoned_utf8_ranges() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "Aé中😀B".to_owned() },
+		)
+		.await;
+		let positions = state
+			.chars(storage.clone())
+			.map_ok(|(_char, position, _attributes)| position)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		let state = dispatch(&storage, &mut time, state, DeleteAction { at: positions[2], last: None }).await;
+		let model = text_model(&storage, &state).await;
+		assert_eq!(model.plain_text().await.unwrap(), "Aé😀B");
+		assert_eq!(model.index(&positions[3]).await.unwrap(), 3);
+		assert_eq!(model.position(3).await.unwrap(), Some(positions[3]));
+
+		let last = positions[3].right_by('😀'.len_utf8() - 1);
+		assert_eq!(model.range(&positions[1], &Some(last)).await.unwrap(), 1..7);
+		assert_eq!(model.range(&positions[2], &None).await.unwrap(), 3..3);
+		let changes = model
+			.text_change(&[
+				DeleteAction { at: positions[2], last: None }.into(),
+				DeleteAction { at: positions[1], last: Some(last) }.into(),
+			])
+			.await
+			.unwrap();
+		assert_eq!(changes.len(), 1);
+		match &changes[0] {
+			TextModelChange::Delete { range } => assert_eq!(range, &(1..7)),
+			_ => panic!("expected delete change"),
+		}
+	}
+
+	#[tokio::test]
+	async fn test_plain_text_preserves_exact_utf8_bytes() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let decomposed = "e\u{301}";
+		let composed = "é";
+		assert_ne!(decomposed.as_bytes(), composed.as_bytes());
+
+		for text in [decomposed, composed, "e\u{301}|é\r\n中\n😀"] {
+			let state = dispatch(
+				&storage,
+				&mut time,
+				RichText::default(),
+				InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: text.to_owned() },
+			)
+			.await;
+			assert_eq!(state.plain_text(&storage).await.unwrap().as_bytes(), text.as_bytes());
+			assert_eq!(text_model(&storage, &state).await.plain_text().await.unwrap().as_bytes(), text.as_bytes());
+		}
 	}
 }
