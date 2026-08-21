@@ -1694,11 +1694,11 @@ mod tests {
 			_ => panic!("expected delete action"),
 		}
 
-		let inserted = dispatch(&storage, &mut time, state.clone(), insert.clone()).await;
+		let inserted = Box::pin(dispatch(&storage, &mut time, state.clone(), insert.clone())).await;
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
-		let inserted = dispatch(&storage, &mut time, state.clone(), insert_end.clone()).await;
+		let inserted = Box::pin(dispatch(&storage, &mut time, state.clone(), insert_end.clone())).await;
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé中😀B!");
-		let anchored = dispatch(&storage, &mut time, state.clone(), empty_insert.clone()).await;
+		let anchored = Box::pin(dispatch(&storage, &mut time, state.clone(), empty_insert.clone())).await;
 		assert_eq!(anchored.plain_text(&storage).await.unwrap(), "Aé中😀B");
 		let anchored_model = text_model(&storage, &anchored).await;
 		assert_eq!(anchored_model.position(3).await.unwrap(), model.position(3).await.unwrap());
@@ -1720,12 +1720,12 @@ mod tests {
 			TextModelChange::Insert { index, .. } => assert_eq!(*index, 3),
 			_ => panic!("expected insert change"),
 		}
-		let inserted = dispatch(&storage, &mut time, anchored, before_anchor).await;
+		let inserted = Box::pin(dispatch(&storage, &mut time, anchored, before_anchor)).await;
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
 		let deleted_state = dispatch(&storage, &mut time, state.clone(), deleted.clone()).await;
 		assert_eq!(deleted_state.plain_text(&storage).await.unwrap(), "AB");
 
-		let formatted_state = dispatch(&storage, &mut time, state.clone(), formatted.clone()).await;
+		let formatted_state = Box::pin(dispatch(&storage, &mut time, state.clone(), formatted.clone())).await;
 		let attributes = formatted_state
 			.chars(storage.clone())
 			.map_ok(|(_char, _position, attributes)| attributes)
