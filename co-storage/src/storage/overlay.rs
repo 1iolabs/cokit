@@ -76,6 +76,19 @@ where
 		self
 	}
 
+	/// Move pending set changes from `source` into this overlay.
+	/// A source containing a removal is rejected unchanged.
+	pub async fn join(&self, source: Self) -> Result<(), StorageError> {
+		source
+			.handle
+			.request({
+				let target = self.clone();
+				move |response| OverlayBlockMessage::Join(target, response)
+			})
+			.await
+			.map_err(|err| StorageError::Internal(err.into()))?
+	}
+
 	/// Flush [`Cid`] changes to base storage.
 	/// Returns a [`OverlayChangeReference`] if there was a change.
 	pub async fn flush(
@@ -403,6 +416,26 @@ where
 					// tell caller to fetch from next
 					response.respond(Ok(None));
 				},
+			},
+			OverlayBlockMessage::Join(target, response) => {
+				if let Some(cid) = state.blocks.iter().find_map(|(cid, block)| block.is_remove().then_some(*cid)) {
+					response.respond(Err(StorageError::InvalidArgument(anyhow!(
+						"overlay join does not support removed block {cid}"
+					))));
+				} else {
+					let mut blocks = HashMap::new();
+					swap(&mut blocks, &mut state.blocks);
+					state.blocks_memory = 0;
+					response.spawn_with(self.spawner.clone(), {
+						let blocks_tmp = self.blocks_tmp.clone();
+						move || async move {
+							for (cid, block) in blocks {
+								flush_block(&target, &blocks_tmp, cid, block).await?;
+							}
+							Ok(())
+						}
+					});
+				}
 			},
 			OverlayBlockMessage::Set(next, extended_block, response) => {
 				response
@@ -815,6 +848,9 @@ where
 	/// Get block.
 	Get(Cid, Response<Result<Option<Block>, StorageError>>),
 
+	/// Move set changes into another overlay.
+	Join(OverlayBlockStorage<S>, Response<Result<(), StorageError>>),
+
 	/// Set block.
 	Set(S, ExtendedBlock, Response<Result<Cid, StorageError>>),
 
@@ -864,9 +900,12 @@ pub enum OverlayChangeReference {
 
 #[cfg(test)]
 mod tests {
-	use crate::{storage::overlay::OverlayChange, MemoryBlockStorage, OverlayBlockStorage};
+	use crate::{
+		storage::overlay::OverlayChange, ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage, MemoryBlockStorage,
+		OverlayBlockStorage,
+	};
 	use cid::Cid;
-	use co_primitives::{Block, BlockStorage, KnownMultiCodec};
+	use co_primitives::{Block, BlockStorage, KnownMultiCodec, MappedCid};
 	use futures::TryStreamExt;
 	use multihash_codetable::{Code, MultihashDigest};
 
@@ -907,6 +946,80 @@ mod tests {
 		assert!(changes.contains(&OverlayChange::Set(*block0.cid(), block0.data().to_vec(), Default::default())));
 		assert!(changes.contains(&OverlayChange::Set(*block1.cid(), block1.data().to_vec(), Default::default())));
 		assert!(changes.contains(&OverlayChange::Set(*block2.cid(), block2.data().to_vec(), Default::default())));
+	}
+
+	#[tokio::test]
+	async fn join_moves_sets_into_target_overlay() {
+		let source_next = MemoryBlockStorage::default();
+		let source_tmp = MemoryBlockStorage::default();
+		let source =
+			OverlayBlockStorage::new(Default::default(), source_next.clone(), source_tmp, Some(1), true, false);
+		let target_next = MemoryBlockStorage::default();
+		let target = OverlayBlockStorage::new(
+			Default::default(),
+			target_next.clone(),
+			MemoryBlockStorage::default(),
+			Some(8),
+			true,
+			false,
+		);
+		let block = block_from_raw([1, 2, 3, 4].to_vec());
+		let mapped = MappedCid::new(
+			*block_from_raw([5, 6, 7, 8].to_vec()).cid(),
+			*block_from_raw([9, 10, 11, 12].to_vec()).cid(),
+		);
+		let options = ExtendedBlockOptions::default().with_references([mapped]);
+		source
+			.set_extended(ExtendedBlock::new(block.clone()).with_options(options.clone()))
+			.await
+			.expect("source set");
+
+		target.join(source.clone()).await.expect("join overlays");
+
+		assert!(source_next.is_empty().await, "source base stays unchanged");
+		assert!(target_next.is_empty().await, "target base stays unchanged");
+		assert!(source.consume_changes().try_collect::<Vec<_>>().await.unwrap().is_empty());
+		assert_eq!(
+			target.consume_changes().try_collect::<Vec<_>>().await.unwrap(),
+			vec![OverlayChange::Set(*block.cid(), block.data().to_vec(), options)]
+		);
+	}
+
+	#[tokio::test]
+	async fn join_rejects_remove_before_changing_target() {
+		let source = OverlayBlockStorage::new(
+			Default::default(),
+			MemoryBlockStorage::default(),
+			MemoryBlockStorage::default(),
+			Some(8),
+			true,
+			false,
+		);
+		let target = OverlayBlockStorage::new(
+			Default::default(),
+			MemoryBlockStorage::default(),
+			MemoryBlockStorage::default(),
+			Some(8),
+			true,
+			false,
+		);
+		let block = block_from_raw([1, 2, 3, 4].to_vec());
+		let removed = *block_from_raw([4, 3, 2, 1].to_vec()).cid();
+		source.set(block.clone()).await.expect("source set");
+		source.remove(&removed).await.expect("source remove");
+
+		let error = target.join(source.clone()).await.expect_err("remove must fail overlay join");
+
+		match error {
+			co_primitives::StorageError::InvalidArgument(error) => {
+				assert!(error.to_string().contains("does not support removed block"));
+			},
+			error => panic!("unexpected overlay join error: {error:?}"),
+		}
+		assert!(target.consume_changes().try_collect::<Vec<_>>().await.unwrap().is_empty());
+		let source_changes = source.consume_changes().try_collect::<Vec<_>>().await.unwrap();
+		assert!(source_changes.contains(&OverlayChange::Set(*block.cid(), block.data().to_vec(), Default::default())));
+		assert!(source_changes.contains(&OverlayChange::Remove(removed)));
 	}
 
 	fn block_from_raw(data: Vec<u8>) -> Block {

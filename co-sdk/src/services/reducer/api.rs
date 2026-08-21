@@ -213,6 +213,10 @@ impl CoReducer {
 		self.storage.clone()
 	}
 
+	pub(crate) fn overlay_storage(&self) -> Option<OverlayBlockStorage<CoStorage>> {
+		self.overlay_storage.clone()
+	}
+
 	/// Get reducer change stream. Upon start the current state is yielded.
 	pub fn reducer_state_stream(&self) -> impl Stream<Item = CoReducerState> {
 		self.handle.stream_graceful(ReducerMessage::StateStream)
@@ -336,6 +340,20 @@ impl CoReducer {
 	/// This call will block the reducer only while the computed state is integrated.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
+		Ok(match self.prepare_join_state(heads).await? {
+			// integrate join
+			Some(state) => self.join_state(state).await?,
+			// no change
+			None => self.reducer_state().await,
+		})
+	}
+
+	/// Compute the state a join of `heads` would produce without blocking the reducer.
+	/// Returns `None` when the join would not change the current state.
+	pub(crate) async fn prepare_join_state(
+		&self,
+		heads: BTreeSet<Cid>,
+	) -> Result<Option<CoReducerState>, anyhow::Error> {
 		// create reducer
 		let (storage, mut reducer) = self.create_memory_reducer().await?;
 
@@ -344,11 +362,9 @@ impl CoReducer {
 
 		// join
 		Ok(if reducer.join(&storage, &heads.1, self.runtime.runtime()).await?.is_some() {
-			// integrate join
-			self.join_state(CoReducerState::new_reducer(&reducer)).await?
+			Some(CoReducerState::new_reducer(&reducer))
 		} else {
-			// no change
-			self.reducer_state().await
+			None
 		})
 	}
 
@@ -357,14 +373,20 @@ impl CoReducer {
 	/// # Concurrency
 	/// This call will block the reducer until the join has been fully processed.
 	pub async fn join_state(&self, state: CoReducerState) -> Result<CoReducerState, anyhow::Error> {
-		// join
-		let co_reducer_state = self
-			.handle
-			.try_request(|r| ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), state, r))
-			.await?;
+		self.join_states(BTreeSet::from([state])).await
+	}
 
-		// result
-		Ok(co_reducer_state)
+	/// Join previous (trusted) snapshots into history which may be used as starting points.
+	///
+	/// # Concurrency
+	/// This call will block the reducer until the joins have been fully processed.
+	pub async fn join_states(&self, states: BTreeSet<CoReducerState>) -> Result<CoReducerState, anyhow::Error> {
+		Ok(self
+			.handle()
+			.try_request(|response| {
+				ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), states, response)
+			})
+			.await?)
 	}
 
 	/// Integrate a pre-computed transaction state into the reducer.
