@@ -68,6 +68,7 @@ pub mod network_identity;
 pub mod network_queue;
 #[cfg(feature = "network")]
 pub mod network_resolver;
+pub mod prepared_join;
 #[cfg(feature = "network")]
 pub mod request_co_state;
 pub mod runtime_dispatch;

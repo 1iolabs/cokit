@@ -12,6 +12,8 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
   until the application shuts down, then drop it (so OpenTelemetry flushes).
 - `push_heads_to_dids` and `HeadsRecipient` for sending current CO heads to
   selected DIDs with durable retries.
+- `CoReducer::join_states(BTreeSet<CoReducerState>)` — join several trusted
+  states in one operation that inserts every snapshot before the first join.
 
 ### Changed
 
@@ -32,6 +34,8 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
 - Queue claims and completions are conditional; stale operations are no-ops and
   cannot mutate a newer task generation.
 - New network tasks now wake the existing queue processor when networking is available.
+- Incoming Heads messages prepare independently, so an unresolved head does
+  not block later valid updates for the same CO. Ready joins are coalesced.
 - **Breaking.** `HeadsDeliveryAttempt` is now `HeadsDeliveryPhase`, with
   `Admission` and `Execution` variants.
 - The queue does not provide exactly-once sends or takeover of tasks abandoned

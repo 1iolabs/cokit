@@ -6,6 +6,8 @@ use crate::library::network_queue::TaskState;
 use crate::{
 	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo, CoStorage, ReducerChangeContext,
 };
+#[cfg(feature = "network")]
+use crate::{CoReducer, CoReducerState};
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
 #[cfg(feature = "network")]
@@ -126,6 +128,10 @@ pub enum Action {
 	/// HeadsMessage has been processed.
 	#[cfg(feature = "network")]
 	HeadsMessageComplete(HeadsMessageReceivedAction, Result<(), HeadsError>),
+
+	/// Opaque coordination for prepared Heads work.
+	#[cfg(feature = "network")]
+	HeadsMessageWork(HeadsMessageWorkAction),
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
 	#[cfg(feature = "network")]
@@ -594,6 +600,47 @@ pub struct HeadsMessageReceivedAction {
 
 	/// Message tags. Used for internal tracking.
 	pub tags: Tags,
+}
+
+#[cfg(feature = "network")]
+#[derive(Clone)]
+pub enum HeadsMessageWorkKind {
+	Prepared(Box<PreparedHeadsMessage>),
+	Finished(CoId),
+}
+
+#[cfg(feature = "network")]
+#[derive(Clone)]
+pub struct PreparedHeadsMessage {
+	pub message: HeadsMessageReceivedAction,
+	pub source: CoReducer,
+	pub state: CoReducerState,
+	pub shared: bool,
+}
+
+/// Opaque Heads coordination payload.
+#[cfg(feature = "network")]
+#[derive(Clone)]
+pub struct HeadsMessageWorkAction(HeadsMessageWorkKind);
+#[cfg(feature = "network")]
+impl HeadsMessageWorkAction {
+	pub fn prepared(prepared: PreparedHeadsMessage) -> Self {
+		Self(HeadsMessageWorkKind::Prepared(Box::new(prepared)))
+	}
+
+	pub fn finished(co: CoId) -> Self {
+		Self(HeadsMessageWorkKind::Finished(co))
+	}
+
+	pub fn kind(&self) -> &HeadsMessageWorkKind {
+		&self.0
+	}
+}
+#[cfg(feature = "network")]
+impl std::fmt::Debug for HeadsMessageWorkAction {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("HeadsMessageWorkAction(..)")
+	}
 }
 
 #[derive(Debug, Clone, thiserror::Error)]

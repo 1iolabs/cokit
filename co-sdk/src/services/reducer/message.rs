@@ -7,6 +7,7 @@ use co_identity::PrivateIdentityBox;
 use co_primitives::{Link, ReducerAction};
 use co_storage::OverlayBlockStorage;
 use ipld_core::ipld::Ipld;
+use std::collections::BTreeSet;
 
 #[derive(Debug)]
 pub enum ReducerMessage {
@@ -25,11 +26,11 @@ pub enum ReducerMessage {
 		Response<Result<CoReducerState, anyhow::Error>>,
 	),
 
-	/// Join state and heads.
+	/// Join states and heads.
 	JoinState(
 		Option<OverlayBlockStorage<CoStorage>>,
 		CoStorage,
-		CoReducerState,
+		BTreeSet<CoReducerState>,
 		Response<Result<CoReducerState, anyhow::Error>>,
 	),
 

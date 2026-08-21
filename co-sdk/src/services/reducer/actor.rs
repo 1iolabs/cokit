@@ -3,7 +3,6 @@
 
 use super::{flush::CoReducerFlush, message::ReducerMessage, FlushInfo, ReducerFlushError};
 use crate::{
-	application::reducer::JoinResult,
 	library::{
 		extract_next_heads::extract_next_heads,
 		log_entries_until::log_entries_until,
@@ -23,7 +22,7 @@ use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
 	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
 };
-use co_storage::{BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorage};
+use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
@@ -106,8 +105,8 @@ impl Actor for ReducerActor {
 				response
 					.respond(handle_push_batch(self, overlay_storage, state, identity, storage, memory_state).await);
 			},
-			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
-				response.respond(handle_join_state(self, overlay_storage, state, storage, join_state).await);
+			ReducerMessage::JoinState(overlay_storage, storage, join_states, response) => {
+				response.respond(handle_join_states(self, overlay_storage, state, storage, join_states).await);
 			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));
@@ -314,22 +313,27 @@ async fn handle_push_batch(
 	}
 }
 
-/// See: [`handle_join`]
-async fn handle_join_state(
+async fn handle_join_states(
 	actor: &ReducerActor,
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	reducer_state: &mut ReducerState,
 	storage: CoStorage,
-	join_state: CoReducerState,
+	join_states: BTreeSet<CoReducerState>,
 ) -> Result<CoReducerState, anyhow::Error> {
+	// save pre-batch heads for the reactive dispatch walk
+	let previous_heads = reducer_state.reducer.heads().clone();
+
 	// internal
 	let root_storage = actor.context.storage(false);
-	let internal_state = join_state.to_internal(&root_storage).await;
+	let mut states = Vec::with_capacity(join_states.len());
+	for state in join_states {
+		states.push(state.to_internal(&root_storage).await);
+	}
 
 	// join
 	let checkpoint = CoReducerState::new_reducer(&reducer_state.reducer);
-	let join_result = match apply_join(&actor.runtime, reducer_state, &storage, internal_state).await {
-		Ok(join_result) => join_result,
+	let changed = match apply_joins(&actor.runtime, reducer_state, &storage, states).await {
+		Ok(changed) => changed,
 		Err(error) => {
 			restore_reducer_state(reducer_state, &checkpoint);
 			return Err(error);
@@ -340,13 +344,12 @@ async fn handle_join_state(
 	let committed_error = flush(actor, reducer_state, overlay_storage, &storage, &checkpoint).await?;
 
 	// reactive
-	//  walk all actions from previous state to new state and dispatch the actions
+	//  walk all actions from the pre-batch heads to the new state and dispatch the actions
 	//  we reverse the actions so they arrive with push order (oldest first)
 	let mut reactive = Result::<(), anyhow::Error>::Ok(());
-	if let Some(join_result) = &join_result {
+	if changed {
 		// we use the current heads as the flush may applied more actions
 		let heads = reducer_state.reducer.heads().clone();
-		let previous_heads = join_result.previous_heads.clone();
 		reactive = dispatch_actions(actor, storage, heads, previous_heads, ReducerChangeContext::new_join()).await;
 	}
 
@@ -414,13 +417,7 @@ async fn flush_before_publication(
 	if let Some(overlay_storage) = overlay_storage {
 		// flush roots from `overlay_storage` to `storage`
 		for root in new_roots.iter() {
-			// filter links
-			// - skip to walk previous head - only use the latest
-			// - skip to walk previous state - only use the latest
-			// - skip weak references
-			let links = BlockLinks::default()
-				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1, true).await?))
-				.with_filter(WeakCoReferenceFilter::new());
+			let links = join_block_links(overlay_storage, root).await?;
 
 			// flush heads
 			for head in &root.1 {
@@ -488,6 +485,18 @@ async fn flush_before_publication(
 	Ok((flush_info, committed_error))
 }
 
+/// Link policy for reducer join roots.
+///
+/// It keeps only the latest log/state path and never follows weak CO references.
+pub(super) async fn join_block_links<S>(storage: &S, state: &CoReducerState) -> Result<BlockLinks, anyhow::Error>
+where
+	S: BlockStorage,
+{
+	Ok(BlockLinks::default()
+		.with_filter(IgnoreFilter::new(extract_next_heads(storage, &state.1, true).await?))
+		.with_filter(WeakCoReferenceFilter::new()))
+}
+
 async fn flush(
 	actor: &ReducerActor,
 	reducer_state: &mut ReducerState,
@@ -539,31 +548,48 @@ fn handle_clear(reducer_state: &mut ReducerState) -> CoReducerState {
 	handle_state(reducer_state)
 }
 
-async fn apply_join(
+/// Apply prepared joins and return whether they changed the reducer.
+async fn apply_joins(
 	runtime: &Runtime,
 	reducer_state: &mut ReducerState,
 	storage: &CoStorage,
-	state: CoReducerState,
-) -> Result<Option<JoinResult>, anyhow::Error> {
-	// insert snapshot if have state and heads
-	if let Some((state, heads)) = state.some() {
-		reducer_state.reducer.insert_snapshot(storage, state, heads).await?;
+	states: Vec<CoReducerState>,
+) -> Result<bool, anyhow::Error> {
+	// insert all snapshots (if have state and heads) before the first join
+	for state in &states {
+		if let Some((state, heads)) = state.some() {
+			reducer_state.reducer.insert_snapshot(storage, state, heads).await?;
+		}
 	}
 
-	// join
-	let result = reducer_state.reducer.join(storage, &state.1, runtime.runtime()).await?;
-	if let Some(_join_result) = &result {
-		// roots
-		// - this will include
-		// 	 - the latest state
-		//     - we dont to flush intermediaries as they are likly not reused and otherwise can be recomputed)
-		// 	 - the latest heads that has been loaded and that are linked (not optimal but fine)
-		let roots = [CoReducerState::new_reducer(&reducer_state.reducer), state];
-
-		// change
-		changed(reducer_state, false, None, roots);
+	// join in supplied-set order and retain effective roots
+	let mut effective = Vec::new();
+	for state in states {
+		if reducer_state
+			.reducer
+			.join(storage, &state.1, runtime.runtime())
+			.await?
+			.is_some()
+		{
+			effective.push(state);
+		}
 	}
-	Ok(result)
+	if effective.is_empty() {
+		return Ok(false);
+	}
+
+	// roots
+	// - this will include
+	// 	 - the latest state
+	//     - we dont to flush intermediaries as they are likly not reused and otherwise can be recomputed)
+	// 	 - the latest heads that has been loaded and that are linked (not optimal but fine)
+	let roots = [CoReducerState::new_reducer(&reducer_state.reducer)]
+		.into_iter()
+		.chain(effective);
+
+	// change
+	changed(reducer_state, false, None, roots);
+	Ok(true)
 }
 
 #[cfg(test)]
@@ -649,6 +675,16 @@ mod tests {
 		Push,
 		Batch,
 		Join,
+		Joins,
+	}
+
+	/// Branches consumed per [`run_operation`] attempt, times the two attempts of the fatal case.
+	fn operation_branches(operation: Operation) -> usize {
+		match operation {
+			Operation::Push | Operation::Batch => 0,
+			Operation::Join => 2,
+			Operation::Joins => 4,
+		}
 	}
 
 	struct TestFlush {
@@ -656,10 +692,17 @@ mod tests {
 		fatal_roots: Option<IndexSet<CoReducerState>>,
 		expect_non_local_after_fatal: bool,
 		call_observer: Option<Arc<AtomicUsize>>,
+		roots_observer: Option<futures::channel::mpsc::UnboundedSender<Vec<CoReducerState>>>,
 	}
 	impl TestFlush {
 		fn new(cases: VecDeque<FlushCase>) -> Self {
-			Self { cases, fatal_roots: None, expect_non_local_after_fatal: false, call_observer: None }
+			Self {
+				cases,
+				fatal_roots: None,
+				expect_non_local_after_fatal: false,
+				call_observer: None,
+				roots_observer: None,
+			}
 		}
 
 		fn expecting_non_local_after_fatal(mut self) -> Self {
@@ -669,6 +712,11 @@ mod tests {
 
 		fn observing_calls(mut self, observer: Arc<AtomicUsize>) -> Self {
 			self.call_observer = Some(observer);
+			self
+		}
+
+		fn observing_roots(mut self, observer: futures::channel::mpsc::UnboundedSender<Vec<CoReducerState>>) -> Self {
+			self.roots_observer = Some(observer);
 			self
 		}
 	}
@@ -684,6 +732,9 @@ mod tests {
 		) -> Result<(), ReducerFlushError> {
 			if let Some(observer) = &self.call_observer {
 				observer.fetch_add(1, Ordering::SeqCst);
+			}
+			if let Some(observer) = &self.roots_observer {
+				observer.unbounded_send(new_roots.clone()).ok();
 			}
 			match self.cases.pop_front().unwrap_or(FlushCase::Success) {
 				FlushCase::Success => {
@@ -712,10 +763,40 @@ mod tests {
 	}
 
 	/// The target CO's observable application actions, in dispatch order.
-	#[derive(Debug, Clone, PartialEq, Eq)]
+	#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 	enum Observed {
 		CoFlush { local: bool, has_local_identity: bool },
 		CoreAction(Cid),
+	}
+
+	/// A batch join dispatches its CoFlush first and every expected action exactly once, but the
+	/// interleaving across independent branches follows the log walk; only each branch's internal
+	/// order (first before second) is fixed. The single-chain operations keep their exact order.
+	fn assert_dispatched_actions(operation: Operation, observed: Vec<Observed>, expected: &[Observed], label: &str) {
+		match operation {
+			Operation::Push | Operation::Batch | Operation::Join => {
+				assert_eq!(observed, expected, "{label}: CoFlush before the operation actions");
+			},
+			Operation::Joins => {
+				assert_eq!(observed.first(), expected.first(), "{label}: the CoFlush leads");
+				let mut observed_sorted = observed.clone();
+				let mut expected_sorted = expected.to_vec();
+				observed_sorted.sort();
+				expected_sorted.sort();
+				assert_eq!(observed_sorted, expected_sorted, "{label}: every action dispatches exactly once");
+				for pair in expected[1..].chunks(2) {
+					let first = observed
+						.iter()
+						.position(|item| item == &pair[0])
+						.expect("first branch action dispatched");
+					let second = observed
+						.iter()
+						.position(|item| item == &pair[1])
+						.expect("second branch action dispatched");
+					assert!(first < second, "{label}: branch actions stay in push order, got {observed:?}");
+				}
+			},
+		}
 	}
 
 	/// Collect every item a stream can yield without blocking, proving nothing extra is already queued.
@@ -850,18 +931,18 @@ mod tests {
 			name: &str,
 			flush_cases: VecDeque<FlushCase>,
 			closed_application_handle: bool,
-			with_branches: bool,
+			branch_count: usize,
 		) -> Self {
-			Self::new_with_test_flush(name, TestFlush::new(flush_cases), closed_application_handle, with_branches).await
+			Self::new_with_test_flush(name, TestFlush::new(flush_cases), closed_application_handle, branch_count).await
 		}
 
 		async fn new_with_test_flush(
 			name: &str,
 			flush: TestFlush,
 			closed_application_handle: bool,
-			with_branches: bool,
+			branch_count: usize,
 		) -> Self {
-			Self::new_with_test_flush_and_handler(name, flush, None, closed_application_handle, with_branches).await
+			Self::new_with_test_flush_and_handler(name, flush, None, closed_application_handle, branch_count).await
 		}
 
 		async fn new_with_test_flush_and_handler(
@@ -869,7 +950,7 @@ mod tests {
 			flush: TestFlush,
 			changed_handler: Option<TestChangedHandler>,
 			closed_application_handle: bool,
-			with_branches: bool,
+			branch_count: usize,
 		) -> Self {
 			co_test::init_test_log();
 			let application = ApplicationBuilder::new_memory(name.to_owned())
@@ -905,35 +986,33 @@ mod tests {
 			// incoming join branches are prepared before any subscription exists, so their own dispatches are
 			// already delivered when the target subscription is installed
 			let mut branches = VecDeque::new();
-			if with_branches {
-				for attempt in 0..2 {
-					let branch_name = format!("{name}-branch-{attempt}");
-					let branch_source = spawn_reducer(
-						&application,
-						&source,
-						application.handle(),
-						&tasks,
-						&branch_name,
-						base_state.clone(),
-						(TestFlush::new([FlushCase::Success].into()), None),
-					)
-					.await;
-					let first_tag = format!("branch-{attempt}-first");
-					let second_tag = format!("branch-{attempt}-second");
-					let first = tags_action(&branch_source, &identity, &first_tag).await;
-					let second = tags_action(&branch_source, &identity, &second_tag).await;
-					branch_source.push_reference(&identity, first).await.expect("branch first push");
-					branch_source
-						.push_reference(&identity, second)
-						.await
-						.expect("branch second push");
-					branches.push_back(Branch {
-						first: *first.cid(),
-						second: *second.cid(),
-						state: branch_source.reducer_state().await,
-						_source: branch_source,
-					});
-				}
+			for attempt in 0..branch_count {
+				let branch_name = format!("{name}-branch-{attempt}");
+				let branch_source = spawn_reducer(
+					&application,
+					&source,
+					application.handle(),
+					&tasks,
+					&branch_name,
+					base_state.clone(),
+					(TestFlush::new([FlushCase::Success].into()), None),
+				)
+				.await;
+				let first_tag = format!("branch-{attempt}-first");
+				let second_tag = format!("branch-{attempt}-second");
+				let first = tags_action(&branch_source, &identity, &first_tag).await;
+				let second = tags_action(&branch_source, &identity, &second_tag).await;
+				branch_source.push_reference(&identity, first).await.expect("branch first push");
+				branch_source
+					.push_reference(&identity, second)
+					.await
+					.expect("branch second push");
+				branches.push_back(Branch {
+					first: *first.cid(),
+					second: *second.cid(),
+					state: branch_source.reducer_state().await,
+					_source: branch_source,
+				});
 			}
 
 			// baselines
@@ -1000,7 +1079,7 @@ mod tests {
 	fn expected_co_flush(operation: Operation) -> Observed {
 		match operation {
 			Operation::Push | Operation::Batch => Observed::CoFlush { local: true, has_local_identity: true },
-			Operation::Join => Observed::CoFlush { local: false, has_local_identity: false },
+			Operation::Join | Operation::Joins => Observed::CoFlush { local: false, has_local_identity: false },
 		}
 	}
 
@@ -1049,6 +1128,22 @@ mod tests {
 				let result = fixture.target.join_state(branch.state.clone()).await;
 				(result, expected)
 			},
+			Operation::Joins => {
+				let first_branch = fixture.branches.pop_front().expect("joins first branch");
+				let second_branch = fixture.branches.pop_front().expect("joins second branch");
+				let expected = vec![
+					expected_co_flush(operation),
+					Observed::CoreAction(first_branch.first),
+					Observed::CoreAction(first_branch.second),
+					Observed::CoreAction(second_branch.first),
+					Observed::CoreAction(second_branch.second),
+				];
+				let result = fixture
+					.target
+					.join_states(BTreeSet::from([first_branch.state.clone(), second_branch.state.clone()]))
+					.await;
+				(result, expected)
+			},
 		}
 	}
 
@@ -1086,11 +1181,7 @@ mod tests {
 					vec![direct.clone()],
 					"{label}: published exactly once"
 				);
-				assert_eq!(
-					fixture.drain_actions().await,
-					expected_actions,
-					"{label}: CoFlush before the operation actions"
-				);
+				assert_dispatched_actions(operation, fixture.drain_actions().await, &expected_actions, &label);
 			},
 			FlushCase::Fatal => {
 				assert_test_flush_error(&result.expect_err("hook error"), &label);
@@ -1147,11 +1238,7 @@ mod tests {
 					vec![follow_up_direct.clone()],
 					"{label}: new stream publishes the follow-up exactly once"
 				);
-				assert_eq!(
-					fixture.drain_actions().await,
-					follow_up_actions,
-					"{label}: only follow-up actions are dispatched in order"
-				);
+				assert_dispatched_actions(operation, fixture.drain_actions().await, &follow_up_actions, &label);
 			},
 		}
 	}
@@ -1159,8 +1246,7 @@ mod tests {
 	async fn assert_operation_matrix(operation: Operation, name: &str) {
 		for case in [FlushCase::Success, FlushCase::Fatal, FlushCase::Committed] {
 			let mut fixture =
-				Fixture::new(&format!("{name}-{case:?}"), [case].into(), false, matches!(operation, Operation::Join))
-					.await;
+				Fixture::new(&format!("{name}-{case:?}"), [case].into(), false, operation_branches(operation)).await;
 			let (result, expected) = run_operation(&mut fixture, operation, 0).await;
 			assert_outcome(&mut fixture, case, operation, result, expected).await;
 		}
@@ -1186,10 +1272,79 @@ mod tests {
 
 	#[co_test::timeout(10000)]
 	#[tokio::test]
+	async fn joins_publish_by_flush_outcome() {
+		assert_operation_matrix(Operation::Joins, "joins").await;
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn empty_and_unchanged_joins_do_not_publish() {
+		let label = "joins-unchanged";
+		let flush_calls = Arc::new(AtomicUsize::new(0));
+		let flush = TestFlush::new([].into()).observing_calls(flush_calls.clone());
+		let mut fixture = Fixture::new_with_test_flush("joins-unchanged", flush, false, 0).await;
+
+		// empty batch
+		let state = fixture.target.join_states(BTreeSet::new()).await.expect("empty batch state");
+		assert_eq!(state, fixture.baseline, "{label}: empty batch returns the baseline");
+
+		// unchanged batch — the baseline joins onto itself
+		let state = fixture
+			.target
+			.join_states(BTreeSet::from([fixture.baseline.clone()]))
+			.await
+			.expect("unchanged batch state");
+		assert_eq!(state, fixture.baseline, "{label}: unchanged batch returns the baseline");
+
+		assert_eq!(flush_calls.load(Ordering::SeqCst), 0, "{label}: the flush hook is never called");
+		assert_eq!(
+			fixture.target.reducer_cache().reducer_state().expect("cache state"),
+			fixture.cache_baseline,
+			"{label}: cache stays at the baseline"
+		);
+		assert!(drain_ready(&mut fixture.state_stream).is_empty(), "{label}: nothing is published");
+		let observed = fixture.drain_actions().await;
+		assert!(observed.is_empty(), "{label}: nothing is dispatched, got {observed:?}");
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn joins_flush_once_with_effective_roots() {
+		let label = "joins-roots";
+		let flush_calls = Arc::new(AtomicUsize::new(0));
+		let (roots_observer, mut observed_roots) = futures::channel::mpsc::unbounded();
+		let flush = TestFlush::new([FlushCase::Success].into())
+			.observing_calls(flush_calls.clone())
+			.observing_roots(roots_observer);
+		let mut fixture = Fixture::new_with_test_flush("joins-roots", flush, false, 2).await;
+
+		let first_branch = fixture.branches.pop_front().expect("first branch");
+		let second_branch = fixture.branches.pop_front().expect("second branch");
+		let states = BTreeSet::from([first_branch.state.clone(), second_branch.state.clone()]);
+		let joined = fixture.target.join_states(states.clone()).await.expect("joined state");
+
+		let direct = fixture.target.reducer_state().await;
+		assert_eq!(joined, direct, "{label}: returned state");
+		assert_eq!(flush_calls.load(Ordering::SeqCst), 1, "{label}: exactly one flush for the batch");
+		let expected_roots: Vec<CoReducerState> = [direct.clone()].into_iter().chain(states).collect();
+		assert_eq!(
+			observed_roots.try_recv().ok(),
+			Some(expected_roots),
+			"{label}: the final state and each effective input are the flush roots in set order"
+		);
+		assert_eq!(
+			drain_ready(&mut fixture.state_stream),
+			vec![direct.clone()],
+			"{label}: the batch publishes exactly once"
+		);
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
 	async fn fatal_local_metadata_does_not_leak_into_join() {
 		let label = "fatal-push/join-success";
 		let flush = TestFlush::new([FlushCase::Fatal].into()).expecting_non_local_after_fatal();
-		let mut fixture = Fixture::new_with_test_flush("fatal-local-then-join", flush, false, true).await;
+		let mut fixture = Fixture::new_with_test_flush("fatal-local-then-join", flush, false, 2).await;
 
 		let (fatal_result, _) = run_operation(&mut fixture, Operation::Push, 0).await;
 		assert_test_flush_error(&fatal_result.expect_err("fatal push error"), label);
@@ -1277,7 +1432,7 @@ mod tests {
 	#[co_test::timeout(10000)]
 	#[tokio::test]
 	async fn operation_errors_before_flush_restore_and_recover() {
-		for operation in [Operation::Push, Operation::Batch, Operation::Join] {
+		for operation in [Operation::Push, Operation::Batch, Operation::Join, Operation::Joins] {
 			let label = format!("changed-handler/{operation:?}");
 			let flush_calls = Arc::new(AtomicUsize::new(0));
 			let flush = TestFlush::new([FlushCase::Success].into()).observing_calls(flush_calls.clone());
@@ -1287,7 +1442,7 @@ mod tests {
 				flush,
 				Some(changed_handler),
 				false,
-				matches!(operation, Operation::Join),
+				operation_branches(operation),
 			)
 			.await;
 
@@ -1357,11 +1512,7 @@ mod tests {
 				vec![follow_up_direct.clone()],
 				"{label}: new stream publishes only the follow-up once"
 			);
-			assert_eq!(
-				fixture.drain_actions().await,
-				follow_up_actions,
-				"{label}: only follow-up actions are dispatched in order"
-			);
+			assert_dispatched_actions(operation, fixture.drain_actions().await, &follow_up_actions, &label);
 		}
 	}
 
@@ -1459,7 +1610,7 @@ mod tests {
 		// a successful hook keeps the current early return on a failed CoFlush dispatch
 		{
 			let label = "closed/Success/Push";
-			let mut fixture = Fixture::new("closed-success-push", [FlushCase::Success].into(), true, false).await;
+			let mut fixture = Fixture::new("closed-success-push", [FlushCase::Success].into(), true, 0).await;
 			let (result, _) = run_operation(&mut fixture, Operation::Push, 0).await;
 			assert_no_test_flush_error(&result.expect_err("dispatch error"), label);
 			let direct = fixture.target.reducer_state().await;
@@ -1475,13 +1626,13 @@ mod tests {
 		}
 
 		// a committed hook error survives both the failed CoFlush dispatch and the failed operation dispatch
-		for operation in [Operation::Push, Operation::Batch, Operation::Join] {
+		for operation in [Operation::Push, Operation::Batch, Operation::Join, Operation::Joins] {
 			let label = format!("closed/Committed/{operation:?}");
 			let mut fixture = Fixture::new(
 				&format!("closed-committed-{operation:?}"),
 				[FlushCase::Committed].into(),
 				true,
-				matches!(operation, Operation::Join),
+				operation_branches(operation),
 			)
 			.await;
 			let (result, _) = run_operation(&mut fixture, operation, 0).await;
