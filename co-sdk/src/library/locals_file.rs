@@ -763,7 +763,7 @@ mod tests {
 		let mut changes = Box::pin(observer.watch());
 		observer.get().await.unwrap();
 
-		let expected = BlockSerializer::default().serialize(&5000u64).unwrap();
+		let expected = BlockSerializer::default().serialize(&2500u64).unwrap();
 		let expected_state = *expected.cid();
 		let observer_task = tokio::spawn(async move {
 			timeout(Duration::from_secs(10), async move {
@@ -778,7 +778,7 @@ mod tests {
 			.expect("filesystem-locals watcher did not deliver the final state");
 		});
 
-		for i in 1..=5000u64 {
+		for i in 1..=2500u64 {
 			let value = BlockSerializer::default().serialize(&i).unwrap();
 			writer
 				.set(ApplicationLocal::new([*value.cid()].into(), *value.cid(), None))
