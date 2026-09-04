@@ -22,7 +22,7 @@ cid = { workspace = true }
 co-core-keystore = { workspace = true }
 co-primitives = { workspace = true }
 did-key = { package = "co-did-key", version = "0.2.2" }
-didcomm-rs = { package = "co-didcomm", version = "0.8.0" }
+didcomm-rs = { package = "co-didcomm", version = "0.8.1" }
 futures = { workspace = true }
 hex = { version = "0.4" }
 ipld-core = { workspace = true }
