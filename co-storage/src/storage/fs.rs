@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, Storage};
+use crate::{
+	library::fs_write::{fs_write_atomic, fs_write_atomic_blocking},
+	BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, Storage,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -10,14 +13,10 @@ use co_primitives::{
 	StorageError, StoreParams,
 };
 use std::{
-	fs::OpenOptions,
-	io::{ErrorKind, Write},
+	io::ErrorKind,
 	os::unix::fs::MetadataExt,
 	path::{Path, PathBuf},
-	thread::sleep,
-	time::Duration,
 };
-use tokio::io::AsyncWriteExt;
 
 /// Filesystem storage.
 ///
@@ -78,52 +77,8 @@ impl Storage for FsStorage {
 			Err(e) => return Err(StorageError::Internal(e.into())),
 		}
 
-		// create parents
-		if let Some(parent) = path.parent() {
-			std::fs::create_dir_all(parent).map_err(|e| StorageError::Internal(e.into()))?;
-		}
-
 		// write
-		let tmp_path = to_cid_path(&self.path, block.cid(), ".");
-		let mut retry = 3;
-		loop {
-			retry -= 1;
-
-			// write exclusive to tmp_path
-			fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				OpenOptions::new()
-					.write(true)
-					.create_new(true)
-					.open(write_path)?
-					.write_all(write_data)
-			}
-			match write(&tmp_path, block.data()) {
-				Ok(_) => {},
-				Err(err) if retry > 0 && err.kind() == ErrorKind::AlreadyExists => {
-					// wait for other process to complete
-					sleep(Duration::from_millis(10));
-
-					// now exists?
-					if std::fs::metadata(&path).is_ok() {
-						break;
-					}
-
-					// retry
-					continue;
-				},
-				Err(err) => {
-					// make sure the tmp file is gone
-					std::fs::remove_file(&tmp_path).ok();
-
-					// forward error
-					Err(err).map_err(|e| StorageError::Internal(e.into()))?;
-				},
-			}
-
-			// move to path
-			std::fs::rename(tmp_path, path).map_err(|e| StorageError::Internal(e.into()))?;
-			break;
-		}
+		fs_write_atomic_blocking(&path, block.data(), true).map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
 		Ok(block.into_inner().0)
@@ -169,58 +124,10 @@ impl BlockStorage for FsStorage {
 			Err(e) => return Err(StorageError::Internal(e.into())),
 		}
 
-		// create parents
-		if let Some(parent) = path.parent() {
-			tokio::fs::create_dir_all(parent)
-				.await
-				.map_err(|e| StorageError::Internal(e.into()))?;
-		}
-
 		// write
-		let tmp_path = to_cid_path(&self.path, block.cid(), ".");
-		let mut retry = 3;
-		loop {
-			retry -= 1;
-
-			// write exclusive to tmp_path
-			async fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				tokio::fs::OpenOptions::new()
-					.write(true)
-					.create_new(true)
-					.open(write_path)
-					.await?
-					.write_all(write_data)
-					.await
-			}
-			match write(&tmp_path, block.data()).await {
-				Ok(_) => {},
-				Err(err) if retry > 0 && err.kind() == ErrorKind::AlreadyExists => {
-					// wait for other process to complete
-					tokio::time::sleep(Duration::from_millis(10)).await;
-
-					// now exists?
-					if tokio::fs::metadata(&path).await.is_ok() {
-						break;
-					}
-
-					// retry
-					continue;
-				},
-				Err(err) => {
-					// make sure the tmp file is gone
-					tokio::fs::remove_file(&tmp_path).await.ok();
-
-					// forward error
-					Err(err).map_err(|e| StorageError::Internal(e.into()))?;
-				},
-			}
-
-			// move to path
-			tokio::fs::rename(tmp_path, path)
-				.await
-				.map_err(|e| StorageError::Internal(e.into()))?;
-			break;
-		}
+		fs_write_atomic(&path, block.data(), true)
+			.await
+			.map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
 		Ok(block.into_inner().0)
@@ -306,7 +213,7 @@ mod tests {
 	use super::to_cid_path;
 	use crate::FsStorage;
 	use cid::Cid;
-	use co_primitives::BlockStorageExt;
+	use co_primitives::{Block, BlockStorage, BlockStorageExt};
 	use co_test::TmpDir;
 	use std::{path::PathBuf, str::FromStr};
 
@@ -330,5 +237,75 @@ mod tests {
 		let cid = storage.set_serialized(&1).await.unwrap();
 		let value: i32 = storage.get_deserialized(&cid).await.unwrap();
 		assert_eq!(value, 1);
+	}
+
+	/// Regression coverage for a same-CID write race: many concurrent writers targeting the
+	/// exact same content (and therefore the exact same `.{cid}` temp path) must all succeed,
+	/// and the final file must contain the complete block.
+	#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+	async fn concurrent_set_same_cid() {
+		const BLOCK_SIZE: usize = 4 * 1024 * 1024;
+
+		for round in 0u8..6 {
+			let tmp = TmpDir::new("co");
+			let storage = FsStorage::new(tmp.path().to_owned());
+			let block = Block::new_data(0x55u64, vec![round; BLOCK_SIZE]);
+			let cid = *block.cid();
+
+			let mut tasks = Vec::with_capacity(64);
+			for _ in 0..64 {
+				let storage = storage.clone();
+				let block = block.clone();
+				tasks.push(tokio::spawn(async move { storage.set(block).await }));
+			}
+
+			for task in tasks {
+				let result = task.await.expect("concurrent_set_same_cid: task panicked");
+				assert!(
+					result.is_ok(),
+					"round {round}: concurrent set of identical block returned an error: {:?}",
+					result.err()
+				);
+			}
+
+			match storage.stat(&cid).await {
+				Ok(stat) => {
+					assert_eq!(stat.size, BLOCK_SIZE as u64, "round {round}: unexpected final block size on disk");
+				},
+				Err(err) => panic!("round {round}: stat after concurrent set failed: {err:?}"),
+			}
+		}
+	}
+
+	/// Regression coverage for an unflushed-write race: `set` must not rename a temp file into
+	/// place until all of its bytes are actually durable, even for writes spanning more than one
+	/// of tokio::fs::File's internal write chunks (2 MiB by default).
+	#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+	async fn set_publishes_complete_bytes() {
+		const BLOCK_SIZE: usize = 4 * 1024 * 1024;
+
+		let tmp = TmpDir::new("co");
+		let storage = FsStorage::new(tmp.path().to_owned());
+
+		for round in 0u8..20 {
+			let mut data = vec![0u8; BLOCK_SIZE];
+			data[0] = round;
+			let expected = data.len();
+			let block = Block::new_data(0x55u64, data);
+			let cid = *block.cid();
+
+			storage
+				.set(block)
+				.await
+				.unwrap_or_else(|err| panic!("round {round}: set failed: {err:?}"));
+
+			// read back synchronously and immediately (no tokio, no yielding) so a rename that
+			// overtook an in-flight background write is observed as a short read.
+			let path = to_cid_path(tmp.path(), &cid, "");
+			let actual = std::fs::read(&path)
+				.unwrap_or_else(|err| panic!("round {round}: reading {path:?} failed: {err:?}"))
+				.len();
+			assert_eq!(actual, expected, "round {round}: read {actual} bytes from {path:?}, expected {expected}");
+		}
 	}
 }
