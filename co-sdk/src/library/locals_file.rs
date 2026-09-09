@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use super::fs_write::fs_write_atomic;
 use crate::library::locals::{ApplicationLocal, Locals};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams, TaskHandle, TaskSpawner};
 use co_primitives::{tags, to_cbor, Tags};
+use co_storage::fs_write_atomic;
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libc::flock;
 use nix::fcntl::{fcntl, FcntlArg, Flock, Flockable};

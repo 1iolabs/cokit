@@ -33,6 +33,7 @@ serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
+tempfile = { version = "3", optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true, default-features = false }
@@ -48,11 +49,12 @@ hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
 co-test = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = []
 logging-verbose = []
-fs = ["tokio/fs", "tokio/io-util"]
+fs = ["tokio/fs", "tokio/io-util", "tokio/rt", "dep:tempfile"]
 web = ["js", "overlay", "co-actor/web"]
 native = ["fs", "overlay"]
 js = ["uuid/js", "getrandom/js", "co-actor/js"]

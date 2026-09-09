@@ -13,6 +13,8 @@ pub use crypto::{
 	block::{Algorithm, AlgorithmError},
 	secret::Secret,
 };
+#[cfg(feature = "fs")]
+pub use library::fs_write::{fs_write_atomic, fs_write_atomic_blocking};
 pub use library::node_reader::node_reader;
 #[cfg(feature = "fs")]
 pub use library::unixfs_add_file::unixfs_add_file;
