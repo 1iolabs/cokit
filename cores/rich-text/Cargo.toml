@@ -27,8 +27,11 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+co-identity = { workspace = true }
+co-log = { workspace = true }
 co-storage = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+co-test = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
