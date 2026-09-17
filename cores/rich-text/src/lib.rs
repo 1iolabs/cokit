@@ -409,6 +409,9 @@ async fn reduce_text_insert<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
+	if action.text.is_empty() {
+		return Err(anyhow!("Invalid insertion: empty text"));
+	}
 	let insertion_point = normalize_insertion_point(state, action.at);
 
 	// position
@@ -463,9 +466,6 @@ where
 			}
 		},
 		InsertionPoint::After(at) => {
-			if create_run.text.is_empty() {
-				return Err(anyhow!("Invalid insertion: empty text after {:?}", at));
-			}
 			let run = transaction.get_run(at).await?;
 			let last = run.char_last(at).ok_or_else(|| anyhow!("Invalid position: {:?}", at))?;
 			let run = if run.last() == last {
@@ -844,6 +844,11 @@ impl<S> TextModel<S>
 where
 	S: BlockStorage + Clone + 'static,
 {
+	/// A model over `state`; an absent state is an empty document.
+	pub fn new(storage: S, state: OptionLink<RichText>) -> Self {
+		Self { storage, state }
+	}
+
 	pub async fn plain_text(&self) -> anyhow::Result<String> {
 		if let Some(state) = self.storage.get_value_or_none(&self.state).await? {
 			Ok(state.plain_text(&self.storage).await?)
@@ -1049,19 +1054,20 @@ where
 	}
 
 	/// Insert action for `text` typed at a UTF-8 byte index.
-	/// Non-empty text anchors to the preceding scalar and carries the attributes resolved at the cursor.
+	/// The text anchors to the preceding scalar and carries the attributes resolved at the cursor.
+	/// `text` must not be empty.
 	pub async fn insert(
 		&self,
 		index: usize,
 		text: String,
 		attributes: AttributesOperation,
 	) -> anyhow::Result<RichTextAction> {
+		if text.is_empty() {
+			return Err(anyhow!("Invalid insertion: empty text"));
+		}
 		let state = self.storage.get_value_or_default(&self.state).await?;
 		let (previous, current) = self.scalars_around(&state, index).await?;
 		let cursor = current.map_or(InsertionPoint::End, InsertionPoint::Before);
-		if text.is_empty() {
-			return Ok(InsertAction { at: cursor, text, attributes }.into());
-		}
 		let at = match (previous, current) {
 			(Some(previous), _) => InsertionPoint::After(previous),
 			(None, Some(current)) => InsertionPoint::Before(current),
@@ -1125,6 +1131,9 @@ where
 		for action in actions {
 			match action {
 				RichTextAction::Insert(action) => {
+					if action.text.is_empty() {
+						return Err(anyhow!("Invalid insertion: empty text"));
+					}
 					let insertion_point = normalize_insertion_point(&state, action.at.clone());
 					let index = match &insertion_point {
 						InsertionPoint::Start => 0,
@@ -1193,13 +1202,13 @@ mod tests {
 	};
 	use cid::Cid;
 	use co_api::{
-		from_cbor, to_cbor, BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, Link, OptionLink,
-		Reducer, ReducerAction,
+		from_cbor, to_cbor, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, Date, Link,
+		OptionLink, Reducer, ReducerAction,
 	};
 	use co_identity::{Identity, IdentityResolver, LocalIdentity, LocalIdentityResolver};
 	use co_log::{IdentityEntryVerifier, Log};
 	use co_storage::MemoryBlockStorage;
-	use futures::{StreamExt, TryStreamExt};
+	use futures::{FutureExt, StreamExt, TryStreamExt};
 	use std::collections::{BTreeMap, BTreeSet};
 
 	async fn apply<S>(
@@ -1212,7 +1221,9 @@ mod tests {
 	{
 		let state_link = storage.set_value(&state).await?;
 		let next_state_link =
-			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true)).await?;
+			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true))
+				.boxed()
+				.await?;
 		Ok(storage.get_value(&next_state_link).await?)
 	}
 
@@ -1241,6 +1252,56 @@ mod tests {
 	async fn text_model(storage: &MemoryBlockStorage, state: &RichText) -> TextModel<MemoryBlockStorage> {
 		let state = storage.set_value(state).await.unwrap();
 		TextModel { storage: storage.clone(), state: state.into() }
+	}
+
+	// the state an earlier core stored for an empty insertion before the scalar at `offset`:
+	// one run split around an inherited empty run
+	async fn inherited_empty_anchor(
+		storage: &MemoryBlockStorage,
+		text: &str,
+		first: Position,
+		offset: usize,
+	) -> (RichText, Position) {
+		let anchor = Position((*storage.set_value(&"anchor".to_owned()).await.unwrap().cid()).into(), 0);
+		let left = Run {
+			id: first,
+			text: text[..offset].to_owned(),
+			attributes: Default::default(),
+			left: None,
+			right: Some(anchor),
+			deleted: false,
+		};
+		let empty = Run {
+			id: anchor,
+			text: String::new(),
+			attributes: Default::default(),
+			left: Some(first.right_by(offset - 1)),
+			right: Some(first.right_by(offset)),
+			deleted: false,
+		};
+		let right = Run {
+			id: first.right_by(offset),
+			text: text[offset..].to_owned(),
+			attributes: Default::default(),
+			left: Some(anchor),
+			right: None,
+			deleted: false,
+		};
+		let runs = CoMap::from_iter(storage, [(first, left), (anchor, empty), (first.right_by(offset), right)])
+			.await
+			.unwrap();
+		let state = RichText { left: Some(first), right: Some(first.right_by(text.len() - 1)), runs };
+		(state, anchor)
+	}
+
+	// the reducer rejects `action` and leaves `state` untouched
+	async fn assert_rejected(storage: &MemoryBlockStorage, state: &RichText, action: impl Into<RichTextAction>) {
+		let mut applied = state.clone();
+		let result = crate::reduce(storage, &mut applied, Cid::default(), action.into())
+			.boxed()
+			.await;
+		assert!(result.is_err());
+		assert_eq!(to_cbor(&applied).unwrap(), to_cbor(state).unwrap());
 	}
 
 	async fn scalar_positions(storage: &MemoryBlockStorage, state: &RichText) -> Vec<Position> {
@@ -1887,9 +1948,9 @@ mod tests {
 		let model = text_model(&storage, &state).await;
 		let insert = model.insert(3, "|".to_owned(), Default::default()).await.unwrap();
 		let insert_end = model.insert(11, "!".to_owned(), Default::default()).await.unwrap();
-		let empty_insert = model.insert(3, String::new(), Default::default()).await.unwrap();
 		assert!(model.insert(2, "|".to_owned(), Default::default()).await.is_err());
 		assert!(model.insert(12, "|".to_owned(), Default::default()).await.is_err());
+		assert!(model.insert(3, String::new(), Default::default()).await.is_err());
 
 		let deleted = model.delete(1..10).await.unwrap();
 		let single = model.delete(1..3).await.unwrap();
@@ -1904,20 +1965,15 @@ mod tests {
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
 		let inserted = Box::pin(dispatch(&storage, &mut time, state.clone(), insert_end.clone())).await;
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé中😀B!");
-		let anchored = Box::pin(dispatch(&storage, &mut time, state.clone(), empty_insert.clone())).await;
+		let (anchored, anchor) = inherited_empty_anchor(&storage, "Aé中😀B", state.left.unwrap(), 3).await;
 		assert_eq!(anchored.plain_text(&storage).await.unwrap(), "Aé中😀B");
 		let anchored_model = text_model(&storage, &anchored).await;
 		assert_eq!(anchored_model.position(3).await.unwrap(), model.position(3).await.unwrap());
-		let anchor = anchored
-			.runs(storage.clone())
-			.try_collect::<Vec<_>>()
-			.await
-			.unwrap()
-			.into_iter()
-			.find(|run| run.text.is_empty())
-			.unwrap()
-			.id;
 		assert!(anchored_model.index(&anchor).await.is_err());
+		let empty_before_anchor: RichTextAction =
+			InsertAction { at: InsertionPoint::Before(anchor), attributes: Default::default(), text: String::new() }
+				.into();
+		assert!(anchored_model.text_change(&[empty_before_anchor]).await.is_err());
 		let before_anchor: RichTextAction =
 			InsertAction { at: InsertionPoint::Before(anchor), attributes: Default::default(), text: "|".to_owned() }
 				.into();
@@ -1928,6 +1984,8 @@ mod tests {
 		}
 		let inserted = Box::pin(dispatch(&storage, &mut time, anchored, before_anchor)).await;
 		assert_eq!(inserted.plain_text(&storage).await.unwrap(), "Aé|中😀B");
+		let linked = inserted.runs(storage.clone()).try_collect::<Vec<_>>().await.unwrap();
+		assert!(linked.iter().any(|run| run.id == anchor && run.text.is_empty()));
 		let deleted_state = dispatch(&storage, &mut time, state.clone(), deleted.clone()).await;
 		assert_eq!(deleted_state.plain_text(&storage).await.unwrap(), "AB");
 
@@ -1942,12 +2000,9 @@ mod tests {
 		let marked_link = storage.set_value(&marked).await.unwrap().into();
 		assert_eq!(attributes, vec![base_attributes, marked_link, marked_link, marked_link, base_attributes]);
 
-		let changes = model
-			.text_change(&[insert, insert_end, empty_insert, deleted, formatted])
-			.await
-			.unwrap();
-		assert_eq!(changes.len(), 5);
-		for (change, index, text) in [(&changes[0], 3, "|"), (&changes[1], 11, "!"), (&changes[2], 3, "")] {
+		let changes = model.text_change(&[insert, insert_end, deleted, formatted]).await.unwrap();
+		assert_eq!(changes.len(), 4);
+		for (change, index, text) in [(&changes[0], 3, "|"), (&changes[1], 11, "!")] {
 			match change {
 				TextModelChange::Insert { index: actual, text: actual_text, .. } => {
 					assert_eq!((*actual, actual_text.as_str()), (index, text));
@@ -1955,11 +2010,11 @@ mod tests {
 				_ => panic!("expected insert change"),
 			}
 		}
-		match &changes[3] {
+		match &changes[2] {
 			TextModelChange::Delete { range } => assert_eq!(range, &(1..10)),
 			_ => panic!("expected delete change"),
 		}
-		match &changes[4] {
+		match &changes[3] {
 			TextModelChange::Format { range, attributes } => {
 				assert_eq!(range, &(1..10));
 				assert_eq!(attributes, &marked);
@@ -2315,26 +2370,7 @@ mod tests {
 		let empty: RichTextAction =
 			InsertAction { at: InsertionPoint::After(id), attributes: Default::default(), text: String::new() }.into();
 		assert!(try_dispatch(&storage, &mut time, state.clone(), empty).await.is_err());
-		let anchored = dispatch(
-			&storage,
-			&mut time,
-			state.clone(),
-			InsertAction {
-				at: InsertionPoint::Before(id.right_by(3)),
-				attributes: Default::default(),
-				text: String::new(),
-			},
-		)
-		.await;
-		let anchor = anchored
-			.runs(storage.clone())
-			.try_collect::<Vec<_>>()
-			.await
-			.unwrap()
-			.into_iter()
-			.find(|run| run.text.is_empty())
-			.unwrap()
-			.id;
+		let (anchored, anchor) = inherited_empty_anchor(&storage, text, id, 3).await;
 		let action: RichTextAction =
 			InsertAction { at: InsertionPoint::After(anchor), attributes: Default::default(), text: "|".to_owned() }
 				.into();
@@ -2343,6 +2379,35 @@ mod tests {
 			.is_err());
 		assert!(text_model(&storage, &anchored).await.text_change(&[action]).await.is_err());
 		assert_eq!(state.plain_text(&storage).await.unwrap(), text);
+	}
+
+	#[tokio::test]
+	async fn test_empty_insertions_are_rejected_without_mutation() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let text = "Aé中😀B";
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: text.to_owned() },
+		)
+		.await;
+		let id = state.left.unwrap();
+		let model = text_model(&storage, &state).await;
+		let empty = RichText::default();
+		let bold = AttributesOperation::Merge(Attributes::default().with_attribute("bold", true));
+
+		for at in [InsertionPoint::Start, InsertionPoint::End, InsertionPoint::Before(id), InsertionPoint::After(id)] {
+			for attributes in [AttributesOperation::default(), bold.clone(), AttributesOperation::RemoveAll] {
+				let action = InsertAction { at: at.clone(), attributes, text: String::new() };
+				assert_rejected(&storage, &empty, action.clone()).await;
+				assert_rejected(&storage, &state, action.clone()).await;
+				assert!(model.text_change(&[action.into()]).await.is_err(), "{at:?}");
+			}
+		}
+		assert_eq!(state.plain_text(&storage).await.unwrap(), text);
+		assert!(model.insert(0, String::new(), bold).await.is_err());
 	}
 
 	#[co_test::timeout(10000)]
@@ -2430,7 +2495,7 @@ mod tests {
 		let model = text_model(&storage, &RichText::default()).await;
 		let (at, attributes) = point(model.insert(0, text("a"), Default::default()).await.unwrap());
 		assert_eq!((at, attributes), (InsertionPoint::Start, AttributesOperation::Replace(Attributes::default())));
-		assert_eq!(point(model.insert(0, String::new(), Default::default()).await.unwrap()).0, InsertionPoint::End);
+		assert!(model.insert(0, String::new(), Default::default()).await.is_err());
 
 		// visible scalars
 		let bold = Attributes::default().with_attribute("bold", true);
@@ -2481,18 +2546,12 @@ mod tests {
 			assert!(model.insert(index, text("x"), Default::default()).await.is_err(), "{index}");
 		}
 
-		// the empty string keeps the historical authoring
-		let (at, attributes) = point(
-			model
-				.insert(3, String::new(), AttributesOperation::Merge(italic.clone()))
-				.await
-				.unwrap(),
-		);
-		assert_eq!(
-			(at, attributes),
-			(InsertionPoint::Before(positions[2]), AttributesOperation::Merge(italic.clone()))
-		);
-		assert_eq!(point(model.insert(6, String::new(), Default::default()).await.unwrap()).0, InsertionPoint::End);
+		// the empty string is rejected
+		assert!(model
+			.insert(3, String::new(), AttributesOperation::Merge(italic.clone()))
+			.await
+			.is_err());
+		assert!(model.insert(6, String::new(), Default::default()).await.is_err());
 
 		// deleted text keeps `End`, resolving the last run's attributes
 		let deleted = dispatch(
@@ -2511,7 +2570,7 @@ mod tests {
 				.unwrap(),
 		);
 		assert_eq!((at, attributes), (InsertionPoint::End, AttributesOperation::Replace(italic)));
-		assert_eq!(point(model.insert(0, String::new(), Default::default()).await.unwrap()).0, InsertionPoint::End);
+		assert!(model.insert(0, String::new(), Default::default()).await.is_err());
 		assert!(model.insert(1, text("x"), Default::default()).await.is_err());
 
 		// at a formatting boundary the snapshot follows the scalar at the cursor, not the anchor

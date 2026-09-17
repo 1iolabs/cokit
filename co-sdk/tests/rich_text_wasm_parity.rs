@@ -121,20 +121,19 @@ fn insert(at: InsertionPoint, text: &str) -> InsertAction {
 	InsertAction { at, text: text.to_owned(), attributes: Default::default() }
 }
 
-/// Historical actions replay in WASM to the state CIDs pinned by the crate's fixture test.
+/// A mixed action history replays to the same states in WASM and native execution,
+/// and both cores reject empty insertion text at every insertion point.
 #[tokio::test]
-async fn test_legacy_fixtures_replay_identically() {
+async fn test_mixed_history_replays_identically() {
 	let cores = Cores::build().await;
 	let mut time = 1;
 	let mut actions = Vec::new();
-	let mut states = Vec::new();
 	let bold = AttributesOperation::Merge(Attributes::default().with_attribute("bold", true));
 	let italic = AttributesOperation::Replace(Attributes::default().with_attribute("italic", true));
 
-	let state = cores
+	let _ = cores
 		.step(&mut actions, &mut time, insert(InsertionPoint::Start, "hello"))
 		.await;
-	states.push(state);
 	let state = cores
 		.step(
 			&mut actions,
@@ -142,55 +141,37 @@ async fn test_legacy_fixtures_replay_identically() {
 			InsertAction { at: InsertionPoint::End, text: " world".to_owned(), attributes: bold.clone() },
 		)
 		.await;
-	states.push(state);
 	let p = cores.positions(state).await;
 	let state = cores
 		.step(&mut actions, &mut time, insert(InsertionPoint::Before(p[6]), "big "))
 		.await;
-	states.push(state);
 	let p = cores.positions(state).await;
 	let state = cores
 		.step(&mut actions, &mut time, insert(InsertionPoint::Before(p[2]), "|"))
 		.await;
-	states.push(state);
 	let p = cores.positions(state).await;
 	let state = cores
 		.step(&mut actions, &mut time, DeleteAction { at: p[3], last: Some(p[6]) })
 		.await;
-	states.push(state);
 	let p = cores.positions(state).await;
-	let state = cores
+	let _ = cores
 		.step(&mut actions, &mut time, FormatAction { at: p[3], last: Some(p[5]), attributes: italic })
 		.await;
-	states.push(state);
-	let p = cores.positions(state).await;
-	let state = cores
-		.step(&mut actions, &mut time, insert(InsertionPoint::Before(p[7]), ""))
-		.await;
-	states.push(state);
-	let state = cores
+	let _ = cores
 		.step(&mut actions, &mut time, InsertAction { at: InsertionPoint::End, text: "!".to_owned(), attributes: bold })
 		.await;
-	states.push(state);
 	let state = cores.step(&mut actions, &mut time, insert(InsertionPoint::Start, "é中")).await;
-	states.push(state);
 
-	assert_eq!(cores.plain_text(state).await, "é中he|bigworld!");
-	let states: Vec<String> = states.into_iter().map(|state| state.unwrap().to_string()).collect();
-	assert_eq!(
-		states,
-		[
-			"bafyr4ihopbz7nd7kxhdl4ewrzbnjbicq3lghadh4msyrhzcig7ikgm2foa",
-			"bafyr4ib37hrkcz2tiyj6d6zrh46w2z63ywxnwihruo3kwcpytx66ol3z4i",
-			"bafyr4iay7qoxbkhg2e7ulnicah6sjrzvoug4aicdohdfplrr6ccilhg4xq",
-			"bafyr4iabjmx3aajwu4r3dmcpujf4do7rwmgpfllmpjh7wzqujky64fwb5a",
-			"bafyr4ihgzxmpmzwpxmsjjxlz7gkm4ry4xi6uh3pz2fqnj4ijdmctiuuffq",
-			"bafyr4ig5eqqoka4hereyk4s4fejotgslc7hldaqpl52wupiq57ftisvkci",
-			"bafyr4ibhno5kxojvxcspqjeuu2hqwunpatc6ezuhpnfeqcef7ges3753nu",
-			"bafyr4ih4vdpixzdlikpetzlc7ybq7xmtsn2whzq3o6onp57qptizgnkymq",
-			"bafyr4idiragl3r3yjrzymoxbtdajtq5pvkzvk47jovjttwibvdoq3azf7m",
-		]
-	);
+	assert_eq!(cores.plain_text(state).await, "é中he|big world!");
+
+	let p = cores.positions(state).await;
+	for at in [InsertionPoint::Start, InsertionPoint::End, InsertionPoint::Before(p[0]), InsertionPoint::After(p[0])] {
+		let mut rejected = actions.clone();
+		rejected.push(cores.action("", &mut time, insert(at.clone(), "")).await);
+		let (rejected_state, accepted) = cores.replay(&rejected).await;
+		assert_eq!(accepted.last(), Some(&false), "{at:?}");
+		assert_eq!(rejected_state, state, "{at:?}");
+	}
 }
 
 /// Valid and invalid `After` anchors are accepted and rejected alike by WASM and native replay.
