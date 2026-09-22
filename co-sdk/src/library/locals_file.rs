@@ -18,7 +18,7 @@ use std::{
 	future::ready,
 	io::ErrorKind,
 	os::fd::AsRawFd,
-	path::{Path, PathBuf},
+	path::{Component, Path, PathBuf},
 	pin::Pin,
 	task::{Context, Poll},
 };
@@ -233,11 +233,13 @@ impl Actor for FileLocalsActor {
 			FileLocalsMessage::WatchStart => {
 				if state.watch.is_none() {
 					// update
+					//  note: this also creates the path if absent
 					state.read(self.config_path.clone()).await?;
 
-					// watch
+					// watch the canonical root
+					let watched_root = tokio::fs::canonicalize(&self.config_path).await.map_err(anyhow::Error::new)?;
 					let cancel = CancellationToken::new();
-					let stream = watch(state.tasks.clone(), self.config_path.clone())?
+					let stream = watch(state.tasks.clone(), watched_root, self.config_path.clone())?
 						.take_until(cancel.clone().cancelled_owned());
 					state.watch = Some((
 						cancel.drop_guard(),
@@ -490,19 +492,19 @@ impl FileLocalsState {
 /// Extract the `local.cbor` paths to re-read from a watch event.
 ///
 /// Watch backends disagree on how an atomic write (temp file + rename-into-place, see
-/// [`fs_write_atomic`]) surfaces, so we cannot key purely on `Create`/`Modify` of the target path:
-/// - inotify (Linux) and FSEvents report `Create`/`Modify` directly on the `local.cbor` path.
-/// - kqueue (macOS) reports a `Remove` of the replaced `local.cbor` plus a `Modify` of the containing slot directory,
-///   and *never* a `Create`/`Modify` of the `local.cbor` path itself.
-///
-/// To cover every backend we map an event to a `local.cbor` re-read when it touches either the
-/// `local.cbor` file directly or the slot directory (`<config_path>/<slot>`) that holds it.
-/// A re-read is idempotent — [`FileLocalsState::update`] deduplicates by heads — so re-reading on a
-/// spurious or coalesced event is harmless.
+/// [`fs_write_atomic`]) surfaces: inotify and FSEvents report the `local.cbor` path itself, while
+/// directory-based backends report a change of the containing slot directory. An event therefore
+/// maps to a re-read when it touches either `<watched_root>/<slot>/local.cbor` or the slot directory
+/// `<watched_root>/<slot>` itself. Event paths start with `watched_root`, the canonical form of the
+/// configured directory. The returned paths are rebuilt beneath `config_path` so they share one key
+/// with initial reads and writes. A re-read is idempotent — [`FileLocalsState::update`] deduplicates
+/// by heads — so re-reading on a spurious or coalesced event is harmless.
 ///
 /// # Arguments
 /// - `event`: Any `Create`/`Modify`/`Remove` events.
-fn local_event_paths(event: &Event, config_path: &Path) -> Vec<PathBuf> {
+/// - `watched_root`: The root handed to the backend. Event paths start with it.
+/// - `config_path`: The configured root that keys the state map.
+fn local_event_paths(event: &Event, watched_root: &Path, config_path: &Path) -> Vec<PathBuf> {
 	if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
 		return Vec::new();
 	}
@@ -510,23 +512,29 @@ fn local_event_paths(event: &Event, config_path: &Path) -> Vec<PathBuf> {
 		.paths
 		.iter()
 		.filter_map(|path| {
-			// event on `<config_path>/<slot>/local.cbor` (inotify / FSEvents, and kqueue's remove)
-			if path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
-				&& path.parent().and_then(|f| f.parent()) == Some(config_path)
-			{
-				return Some(path.clone());
+			let mut relative = path.strip_prefix(watched_root).ok()?.components();
+			let Some(Component::Normal(slot)) = relative.next() else {
+				return None;
+			};
+			match (relative.next(), relative.next()) {
+				// event on the `<slot>` directory itself
+				(None, _) => Some(config_path.join(slot).join("local.cbor")),
+				// event on `<slot>/local.cbor`
+				(Some(Component::Normal(file)), None) if file == "local.cbor" => {
+					Some(config_path.join(slot).join("local.cbor"))
+				},
+				_ => None,
 			}
-			// event on the `<config_path>/<slot>` directory itself (kqueue's rename signal)
-			if path.parent() == Some(config_path) {
-				return Some(path.join("local.cbor"));
-			}
-			None
 		})
 		.collect()
 }
 
-/// Watch for all local.cbor changes in config_path.
-fn watch(tasks: TaskSpawner, config_path: PathBuf) -> Result<impl Stream<Item = PathBuf>, anyhow::Error> {
+/// Watch for all local.cbor changes beneath `watched_root`, reported as paths beneath `config_path`.
+fn watch(
+	tasks: TaskSpawner,
+	watched_root: PathBuf,
+	config_path: PathBuf,
+) -> Result<impl Stream<Item = PathBuf>, anyhow::Error> {
 	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<notify::Event, notify::Error>>();
 
 	// watcher
@@ -536,17 +544,17 @@ fn watch(tasks: TaskSpawner, config_path: PathBuf) -> Result<impl Stream<Item = 
 			tx.send(event).ok();
 		}
 	})?;
-	watcher.watch(&config_path, RecursiveMode::Recursive)?;
+	watcher.watch(&watched_root, RecursiveMode::Recursive)?;
 
 	// shutdown
 	tasks.spawn({
-		let config_path = config_path.clone();
+		let watched_root = watched_root.clone();
 		async move {
 			// wait reader is dropped
 			tx.closed().await;
 
 			// unwatch
-			watcher.unwatch(&config_path).ok();
+			watcher.unwatch(&watched_root).ok();
 		}
 	});
 
@@ -564,7 +572,7 @@ fn watch(tasks: TaskSpawner, config_path: PathBuf) -> Result<impl Stream<Item = 
 				})
 			}
 		})
-		.filter_map(move |event| ready(Some(local_event_paths(&event, &config_path))))
+		.filter_map(move |event| ready(Some(local_event_paths(&event, &watched_root, &config_path))))
 		.flat_map(|paths: Vec<PathBuf>| stream::iter(paths));
 
 	// result
@@ -589,7 +597,7 @@ mod tests {
 	use co_primitives::BlockSerializer;
 	use co_test::TmpDir;
 	use std::{
-		path::PathBuf,
+		path::{Path, PathBuf},
 		sync::{
 			atomic::{AtomicBool, Ordering},
 			Arc,
@@ -693,25 +701,25 @@ mod tests {
 
 		// rename-into-place (atomic write) - the case the old filter missed
 		let ev = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To))).add_path(local.clone());
-		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+		assert_eq!(super::local_event_paths(&ev, &config, &config), vec![local.clone()]);
 
 		// in-place data modify still matches
 		let ev = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Any))).add_path(local.clone());
-		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+		assert_eq!(super::local_event_paths(&ev, &config, &config), vec![local.clone()]);
 
 		// create still matches
 		let ev = Event::new(EventKind::Create(CreateKind::File)).add_path(local.clone());
-		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+		assert_eq!(super::local_event_paths(&ev, &config, &config), vec![local.clone()]);
 
 		// `.tmp` / `.lock` siblings are ignored (filename gate)
 		let ev = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
 			.add_path(tmp)
 			.add_path(lock);
-		assert!(super::local_event_paths(&ev, &config).is_empty());
+		assert!(super::local_event_paths(&ev, &config, &config).is_empty());
 
 		// unrelated event kinds are ignored
 		let ev = Event::new(EventKind::Access(AccessKind::Read)).add_path(local);
-		assert!(super::local_event_paths(&ev, &config).is_empty());
+		assert!(super::local_event_paths(&ev, &config, &config).is_empty());
 	}
 
 	/// The exact event sequence the macOS `kqueue` backend delivers for an atomic write
@@ -732,15 +740,43 @@ mod tests {
 
 		// temp-file create in the slot dir must NOT trigger a re-read
 		let ev = Event::new(EventKind::Create(CreateKind::File)).add_path(tmp);
-		assert!(super::local_event_paths(&ev, &config).is_empty());
+		assert!(super::local_event_paths(&ev, &config, &config).is_empty());
 
 		// modify of the slot directory itself maps to that slot's `local.cbor`
 		let ev = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Any))).add_path(slot);
-		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+		assert_eq!(super::local_event_paths(&ev, &config, &config), vec![local.clone()]);
 
 		// remove of the replaced `local.cbor` (fired after the rename completes) maps to a re-read
 		let ev = Event::new(EventKind::Remove(RemoveKind::Any)).add_path(local.clone());
-		assert_eq!(super::local_event_paths(&ev, &config), vec![local]);
+		assert_eq!(super::local_event_paths(&ev, &config, &config), vec![local]);
+	}
+
+	/// Events arrive beneath the watched root while state keys use the configured root. Both
+	/// spellings of one directory must map to the same `local.cbor` path; paths outside it must not.
+	#[test]
+	fn test_local_event_paths_maps_watched_root_onto_config_path() {
+		use notify::{
+			event::{DataChange, ModifyKind},
+			Event, EventKind,
+		};
+
+		let map = |watched: &str, config: &str, path: &str| {
+			let event = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Any))).add_path(PathBuf::from(path));
+			super::local_event_paths(&event, Path::new(watched), Path::new(config))
+		};
+		let local = |config: &str| vec![PathBuf::from(config).join("app").join("local.cbor")];
+
+		// equal roots: target file and slot directory
+		assert_eq!(map("/cfg", "/cfg", "/cfg/app/local.cbor"), local("/cfg"));
+		assert_eq!(map("/cfg", "/cfg", "/cfg/app"), local("/cfg"));
+
+		// configured `/var` root watched through its canonical `/private/var` spelling
+		assert_eq!(map("/private/var/cfg", "/var/cfg", "/private/var/cfg/app/local.cbor"), local("/var/cfg"));
+		assert_eq!(map("/private/var/cfg", "/var/cfg", "/private/var/cfg/app"), local("/var/cfg"));
+
+		// unrelated paths
+		assert!(map("/private/var/cfg", "/var/cfg", "/private/var/other/app/local.cbor").is_empty());
+		assert!(map("/private/var/cfg", "/var/cfg", "/private/var/other/app").is_empty());
 	}
 
 	#[cfg(target_os = "macos")]
