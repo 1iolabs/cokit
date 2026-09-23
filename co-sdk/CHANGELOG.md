@@ -47,6 +47,10 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
 - **Breaking.** Re-exports `co_sdk::{TracingBuilder, env_filter, LogSink, parse_log_sink, resolve_filter}`.
 - **Breaking.** Cargo features `tracing`, `bunyan`, `opentelemetry` (the `native` feature no longer enables them).
 
+### Fixed
+
+- macOS: fixed too many open files by switching to the watcher fsevents backend.
+
 ## [0.1.0] - 2026-03-31
 
 Initial release.
