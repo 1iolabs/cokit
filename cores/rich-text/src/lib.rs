@@ -557,10 +557,6 @@ where
 	let mut run = transaction.get_run(at).await?;
 	let last = action_last(&run, at, action.last)?;
 
-	// attributes
-	let attributes = attributes_run(storage, Some(&run), &action.attributes).await?;
-	let attributes_link = storage.set_value(&attributes).await?.into();
-
 	// apply
 	loop {
 		let next_id = run.right;
@@ -572,7 +568,7 @@ where
 			run = right;
 		}
 
-		// slipt off right?
+		// split off right?
 		let is_last = if run.contains(last) {
 			if !run.is_char_end(last) {
 				return Err(anyhow!("Invalid range"));
@@ -592,8 +588,9 @@ where
 			false
 		};
 
-		// change the whole run
-		run.attributes = attributes_link;
+		// change the whole run from its own attributes
+		let attributes = attributes_run(storage, Some(&run), &action.attributes).await?;
+		run.attributes = storage.set_value(&attributes).await?.into();
 		transaction.runs.get_mut().await?.insert(run.id, run).await?;
 
 		// next
@@ -800,7 +797,8 @@ where
 	})
 }
 
-/// Get attributes for `AttributesOperation` at `insertion_point`.
+/// Resolve `attributes` against the attributes of `run`.
+/// `Replace` and `RemoveAll` ignore the run.
 async fn attributes_run<S>(
 	storage: &S,
 	run: Option<&Run>,
@@ -1170,20 +1168,46 @@ where
 				RichTextAction::Format(action) => {
 					let range = self.range(&action.at, &action.last).await?;
 					if !range.is_empty() {
-						let attributes = attributes_insertion_point(
-							&self.storage,
-							&state,
-							&mut transaction,
-							&InsertionPoint::Before(action.at),
-							&action.attributes,
-						)
-						.await?;
-						result.push(TextModelChange::Format { range, attributes });
+						result.extend(self.format_changes(&state, action, range).boxed().await?);
 					}
 				},
 			}
 		}
 		Ok(result)
+	}
+
+	/// One change per run inside `range`, adjacent runs with equal results merged.
+	async fn format_changes(
+		&self,
+		state: &RichText,
+		action: &FormatAction,
+		range: Range<usize>,
+	) -> anyhow::Result<Vec<TextModelChange>> {
+		let mut segments: Vec<(Range<usize>, Attributes)> = Vec::new();
+		let mut index = 0;
+		let runs = state.runs(self.storage.clone());
+		pin_mut!(runs);
+		while let Some(run) = runs.try_next().await? {
+			if run.deleted {
+				continue;
+			}
+			let segment = index.max(range.start)..(index + run.text.len()).min(range.end);
+			index += run.text.len();
+			if segment.is_empty() {
+				continue;
+			}
+			let attributes = attributes_run(&self.storage, Some(&run), &action.attributes).await?;
+			match segments.last_mut() {
+				Some((last, previous)) if last.end == segment.start && *previous == attributes => {
+					last.end = segment.end;
+				},
+				_ => segments.push((segment, attributes)),
+			}
+		}
+		Ok(segments
+			.into_iter()
+			.map(|(range, attributes)| TextModelChange::Format { range, attributes })
+			.collect())
 	}
 }
 
@@ -1209,7 +1233,10 @@ mod tests {
 	use co_log::{IdentityEntryVerifier, Log};
 	use co_storage::MemoryBlockStorage;
 	use futures::{FutureExt, StreamExt, TryStreamExt};
-	use std::collections::{BTreeMap, BTreeSet};
+	use std::{
+		collections::{BTreeMap, BTreeSet},
+		ops::Range,
+	};
 
 	async fn apply<S>(
 		storage: &S,
@@ -1813,6 +1840,269 @@ mod tests {
 		assert_eq!(characters[7], ('r', attributes0_link));
 		assert_eq!(characters[8], ('l', attributes0_link));
 		assert_eq!(characters[9], ('d', attributes0_link));
+	}
+
+	fn marks(names: &[&str]) -> Attributes {
+		names
+			.iter()
+			.fold(Attributes::default(), |attributes, name| attributes.with_attribute(*name, true))
+	}
+
+	fn names(names: &[&str]) -> BTreeSet<String> {
+		names.iter().map(|name| (*name).to_owned()).collect()
+	}
+
+	// one run per piece, inserted at the end with exactly the given attributes
+	async fn runs_state(storage: &MemoryBlockStorage, time: &mut Date, pieces: &[(&str, Attributes)]) -> RichText {
+		let mut state = RichText::default();
+		for (text, attributes) in pieces {
+			let action = InsertAction {
+				at: InsertionPoint::End,
+				attributes: AttributesOperation::Replace(attributes.clone()),
+				text: (*text).to_owned(),
+			};
+			state = Box::pin(dispatch(storage, time, state, action)).await;
+		}
+		state
+	}
+
+	async fn format_range(
+		storage: &MemoryBlockStorage,
+		time: &mut Date,
+		state: RichText,
+		range: Range<usize>,
+		operation: AttributesOperation,
+	) -> RichText {
+		let action = text_model(storage, &state).await.format(range, operation).await.unwrap();
+		Box::pin(dispatch(storage, time, state, action)).await
+	}
+
+	async fn char_attributes(
+		storage: &MemoryBlockStorage,
+		state: &RichText,
+	) -> Vec<(char, OptionLink<Attributes>, Attributes)> {
+		let chars = state.chars(storage.clone()).try_collect::<Vec<_>>().await.unwrap();
+		let mut result = Vec::new();
+		for (char, _position, link) in chars {
+			result.push((char, link, storage.get_value_or_default(&link).await.unwrap()));
+		}
+		result
+	}
+
+	async fn assert_char_attributes(storage: &MemoryBlockStorage, state: &RichText, pieces: &[(&str, Attributes)]) {
+		let observed = char_attributes(storage, state)
+			.await
+			.into_iter()
+			.map(|(char, _link, attributes)| (char, attributes))
+			.collect::<Vec<_>>();
+		let expected = pieces
+			.iter()
+			.flat_map(|(text, attributes)| text.chars().map(move |char| (char, attributes.clone())))
+			.collect::<Vec<_>>();
+		assert_eq!(observed, expected);
+	}
+
+	async fn format_changes(
+		storage: &MemoryBlockStorage,
+		state: &RichText,
+		range: Range<usize>,
+		operation: AttributesOperation,
+	) -> Vec<(Range<usize>, Attributes)> {
+		let model = text_model(storage, state).await;
+		let action = model.format(range, operation).await.unwrap();
+		model
+			.text_change(&[action])
+			.await
+			.unwrap()
+			.iter()
+			.map(|change| match change {
+				TextModelChange::Format { range, attributes } => (range.clone(), attributes.clone()),
+				other => panic!("expected format change: {other:?}"),
+			})
+			.collect()
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_from_plain_run_keeps_next_run_attributes() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["italic"]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&["bold"])), ("b", marks(&["bold", "italic"]))]).await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_from_attributed_run_does_not_spread() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&["italic"])), ("b", marks(&[]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&["bold", "italic"])), ("b", marks(&["bold"]))]).await;
+	}
+
+	#[tokio::test]
+	async fn test_format_remove_from_plain_run_keeps_next_run_attributes() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["bold", "italic"]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::Remove(names(&["bold"]))).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&[])), ("b", marks(&["italic"]))]).await;
+	}
+
+	#[tokio::test]
+	async fn test_format_remove_from_attributed_run_does_not_spread() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&["bold", "italic"])), ("b", marks(&[]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::Remove(names(&["bold"]))).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&["italic"])), ("b", marks(&[]))]).await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_does_not_spread_link() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let linked = Attributes::default().with_attribute("link", "https://cokit.org");
+		let state = runs_state(&storage, &mut time, &[("a", linked.clone()), ("b", marks(&[]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(
+			&storage,
+			&state,
+			&[("a", linked.with_attribute("bold", true)), ("b", marks(&["bold"]))],
+		)
+		.await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_across_three_runs_keeps_each_run() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let pieces = [("a", marks(&[])), ("b", marks(&["italic"])), ("c", marks(&["underline"]))];
+		let state = runs_state(&storage, &mut time, &pieces).await;
+		let state = format_range(&storage, &mut time, state, 0..3, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(
+			&storage,
+			&state,
+			&[("a", marks(&["bold"])), ("b", marks(&["bold", "italic"])), ("c", marks(&["bold", "underline"]))],
+		)
+		.await;
+		let links = char_attributes(&storage, &state)
+			.await
+			.into_iter()
+			.map(|(_char, link, _attributes)| link)
+			.collect::<Vec<_>>();
+		assert_ne!(links[0], links[1]);
+		assert_ne!(links[1], links[2]);
+		assert_ne!(links[0], links[2]);
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_across_split_boundaries_from_plain() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("alpha beta gamma", marks(&[]))]).await;
+		let state =
+			format_range(&storage, &mut time, state, 6..10, AttributesOperation::Merge(marks(&["italic"]))).await;
+		let state = format_range(&storage, &mut time, state, 0..10, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(
+			&storage,
+			&state,
+			&[("alpha ", marks(&["bold"])), ("beta", marks(&["bold", "italic"])), (" gamma", marks(&[]))],
+		)
+		.await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_across_split_boundaries_from_attributed() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("alpha beta gamma", marks(&[]))]).await;
+		let state =
+			format_range(&storage, &mut time, state, 6..10, AttributesOperation::Merge(marks(&["italic"]))).await;
+		let state = format_range(&storage, &mut time, state, 6..16, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(
+			&storage,
+			&state,
+			&[("alpha ", marks(&[])), ("beta", marks(&["bold", "italic"])), (" gamma", marks(&["bold"]))],
+		)
+		.await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_inside_one_run() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("abc", marks(&["italic"]))]).await;
+		let state = format_range(&storage, &mut time, state, 1..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_char_attributes(
+			&storage,
+			&state,
+			&[("a", marks(&["italic"])), ("b", marks(&["bold", "italic"])), ("c", marks(&["italic"]))],
+		)
+		.await;
+	}
+
+	#[tokio::test]
+	async fn test_format_merge_single_scalar() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["italic"]))]).await;
+		let action = text_model(&storage, &state)
+			.await
+			.format(1..2, AttributesOperation::Merge(marks(&["bold"])))
+			.await
+			.unwrap();
+		match &action {
+			RichTextAction::Format(action) => assert_eq!(action.last, None),
+			_ => panic!("expected format action"),
+		}
+		let state = Box::pin(dispatch(&storage, &mut time, state, action)).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&[])), ("b", marks(&["bold", "italic"]))]).await;
+	}
+
+	#[tokio::test]
+	async fn test_format_replace_over_mixed_runs_shares_one_link() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["italic"]))]).await;
+		let state =
+			format_range(&storage, &mut time, state, 0..2, AttributesOperation::Replace(marks(&["bold"]))).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&["bold"])), ("b", marks(&["bold"]))]).await;
+		let links = char_attributes(&storage, &state).await;
+		assert_eq!(links[0].1, links[1].1);
+	}
+
+	#[tokio::test]
+	async fn test_format_remove_all_over_mixed_runs_shares_one_link() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&["bold"])), ("b", marks(&["italic"]))]).await;
+		let state = format_range(&storage, &mut time, state, 0..2, AttributesOperation::RemoveAll).await;
+		assert_char_attributes(&storage, &state, &[("a", marks(&[])), ("b", marks(&[]))]).await;
+		let links = char_attributes(&storage, &state).await;
+		assert_eq!(links[0].1, links[1].1);
+	}
+
+	#[tokio::test]
+	async fn test_text_change_format_reports_each_attribute_segment() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state = runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["italic"]))]).await;
+		let changes = format_changes(&storage, &state, 0..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_eq!(changes, vec![(0..1, marks(&["bold"])), (1..2, marks(&["bold", "italic"]))]);
+	}
+
+	#[tokio::test]
+	async fn test_text_change_format_across_deleted_run_reports_one_change() {
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+		let state =
+			runs_state(&storage, &mut time, &[("a", marks(&[])), ("b", marks(&["italic"])), ("c", marks(&[]))]).await;
+		let delete = text_model(&storage, &state).await.delete(1..2).await.unwrap();
+		let state = Box::pin(dispatch(&storage, &mut time, state, delete)).await;
+		assert_eq!(text_model(&storage, &state).await.plain_text().await.unwrap(), "ac");
+		let changes = format_changes(&storage, &state, 0..2, AttributesOperation::Merge(marks(&["bold"]))).await;
+		assert_eq!(changes, vec![(0..2, marks(&["bold"]))]);
 	}
 
 	#[tokio::test]

@@ -15,6 +15,11 @@
   Edit starts and half-open range ends must be Unicode scalar boundaries.
   An omitted delete or format end affects one scalar.
 
+### Fixed
+
+- `Format` with `Merge` or `Remove` over runs with different attributes applies the operation to each run's own attributes instead of the first run's.
+- `TextModel::text_change` reports one `Format` change per resulting attribute segment.
+
 ## [0.1.0] - 2026-03-31
 
 Initial release.
